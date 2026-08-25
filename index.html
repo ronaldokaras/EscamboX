@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="EscamboX – Plataforma de trocas e vendas com moedas virtuais e geolocalização.">
+    <title>EscamboX – Trocas e Vendas</title>
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <header class="topbar">
+        <a class="logo" onclick="showSection('home')" title="EscamboX">
+            <svg viewBox="0 0 24 24"><path d="M7 17l5-5-5-5m6 10h6"/></svg>
+            <span>Escambo<span class="logo-x">X</span></span>
+        </a>
+        
+        <div class="search-bar" role="search">
+            <input type="text" id="searchInput" placeholder="Buscar itens..." aria-label="Buscar itens" oninput="debouncedSearch()">
+            <button onclick="handleSearch()" aria-label="Buscar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </button>
+        </div>
+
+        <div class="actions">
+            <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()" aria-label="Alternar tema" title="Alternar tema">
+                <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+            
+            <button id="notifBtn" class="notification-btn hidden" onclick="toggleNotifications()" aria-label="Notificações" title="Notificações">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                <span id="notifBadge" class="notification-badge hidden">0</span>
+            </button>
+
+            <div id="userArea" class="user-menu hidden">
+                <button class="user-btn" onclick="toggleUserMenu(event)" aria-haspopup="true" title="Menu do usuário">
+                    <span id="tbAvatar" class="user-avatar">?</span>
+                    <span id="tbName">...</span>
+                </button>
+                <div id="userDropdown" class="dropdown-content">
+                    <div class="dropdown-header">
+                        <div id="ddUserName" class="fw-bold">...</div>
+                        <div id="ddUserEmail" class="text-muted fs-sm">...</div>
+                        <div class="wallet-info">Saldo: <span id="ddWallet" class="wallet-badge">0</span></div>
+                    </div>
+                    <div class="dropdown-divider"></div>
+                    <a onclick="showSection('profile'); closeUserMenu();">Meu perfil</a>
+                    <a onclick="showSection('trades'); closeUserMenu();">Meus negócios</a>
+                    <a onclick="showSection('missions'); closeUserMenu();">Missões</a>
+                    <a onclick="showSection('ranking'); closeUserMenu();">Ranking</a>
+                    <a onclick="showSection('faq'); closeUserMenu();">FAQ</a>
+                    <a id="ddAdminLink" class="hidden" onclick="showSection('admin'); closeUserMenu();">Painel admin</a>
+                    <div class="dropdown-divider"></div>
+                    <button class="dropdown-logout" onclick="logout()">Sair</button>
+                </div>
+            </div>
+
+            <span id="authArea">
+                <button class="btn-header" onclick="openAuth('login')">Entrar</button>
+                <button class="btn-header" onclick="openAuth('register')">Criar conta</button>
+            </span>
+
+            <button class="btn-sell hidden" id="sellBtn" onclick="openSellModal()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Publicar
+            </button>
+        </div>
+    </header>
+
+    <nav class="subnav" id="subnav">
+        <a data-section="home" class="active" onclick="showSection('home')">Explorar</a>
+        <a data-section="trades" class="auth-only hidden" onclick="showSection('trades')">Negócios <span id="navPending"></span></a>
+        <a data-section="missions" class="auth-only hidden" onclick="showSection('missions')">Missões</a>
+        <a data-section="ranking" onclick="showSection('ranking')">Ranking</a>
+        <a data-section="profile" class="auth-only hidden" onclick="showSection('profile')">Perfil</a>
+        <a data-section="faq" onclick="showSection('faq')">FAQ</a>
+        <a data-section="admin" class="admin-only hidden" onclick="showSection('admin')">Admin</a>
+    </nav>
+
+    <main class="container">
+        <!-- Seção Home -->
+        <section id="sec-home">
+            <div class="hero-banner">
+                <div>
+                    <h2>Troque, venda e economize moedas</h2>
+                    <p>Receba 20 moedas ao se cadastrar e +5 em cada escambo puro.</p>
+                </div>
+                <button class="btn-hero" onclick="heroCta()">Começar Agora</button>
+            </div>
+
+            <div class="filters-bar">
+                <div id="catChips" class="chip-row"></div>
+                <div class="filter-row-top">
+                    <select id="selType" class="filter-select" aria-label="Tipo de anúncio" onchange="setFilter('type', this.value)">
+                        <option value="all">Tipo: todos</option>
+                        <option value="sale">Venda</option>
+                        <option value="trade">Troca</option>
+                    </select>
+                    <select id="selCondition" class="filter-select" aria-label="Condição" onchange="setFilter('condition', this.value)">
+                        <option value="all">Condição: todas</option>
+                        <option value="novo">Novo</option>
+                        <option value="seminovo">Seminovo</option>
+                        <option value="usado">Usado</option>
+                    </select>
+                    <select id="selSort" class="filter-select" aria-label="Ordenar anúncios" onchange="setSort(this.value)">
+                        <option value="recent">Mais recentes</option>
+                        <option value="price_asc">Menor preço</option>
+                        <option value="price_desc">Maior preço</option>
+                        <option value="rating">Melhor avaliação</option>
+                        <option value="distance">Mais próximos</option>
+                    </select>
+                    <button class="list-toggle-btn active" id="btnGridView" onclick="setViewMode('grid')" title="Grade">▦</button>
+                    <button class="list-toggle-btn" id="btnListView" onclick="setViewMode('list')" title="Lista">☷</button>
+                </div>
+                <div class="filter-row-bottom">
+                    <input type="number" id="minPrice" class="filter-select price-input" placeholder="Preço mín" onchange="setFilter('minPrice', this.value)">
+                    <input type="number" id="maxPrice" class="filter-select price-input" placeholder="Preço máx" onchange="setFilter('maxPrice', this.value)">
+                    <select id="selRadius" class="filter-select" aria-label="Raio de distância" onchange="setRadius(this.value)">
+                        <option value="0">Raio: qualquer</option>
+                        <option value="5">5 km</option>
+                        <option value="10">10 km</option>
+                        <option value="20">20 km</option>
+                        <option value="50">50 km</option>
+                        <option value="100">100 km</option>
+                    </select>
+                </div>
+                <span id="resultsInfo" class="results-info"></span>
+            </div>
+
+            <div id="itemsGrid" class="grid"></div>
+            <div id="loadMoreSentinel" class="sentinel"></div>
+        </section>
+
+        <!-- Seção Negócios -->
+        <section id="sec-trades" class="hidden">
+            <h2 class="section-title">Propostas recebidas</h2>
+            <ul id="incomingTrades" class="proposal-list"></ul>
+            <h2 class="section-title">Minhas propostas</h2>
+            <ul id="outgoingTrades" class="proposal-list"></ul>
+            <h2 class="section-title">Histórico</h2>
+            <ul id="doneTrades" class="proposal-list"></ul>
+        </section>
+
+        <!-- Seção Missões -->
+        <section id="sec-missions" class="hidden">
+            <h2 class="section-title">Missões Diárias & Conquistas</h2>
+            <div id="missionsList" class="missions-grid"></div>
+        </section>
+
+        <!-- Seção Ranking -->
+        <section id="sec-ranking" class="hidden">
+            <h2 class="section-title">Ranking de Reputação</h2>
+            <p class="text-muted mb-3">Score = média de estrelas × 10 + negócios × 5</p>
+            <div class="table-scroll">
+                <table class="admin-table">
+                    <thead><tr><th>#</th><th>Usuário</th><th>Avaliação</th><th>Negócios</th><th>Score</th></tr></thead>
+                    <tbody id="rankingBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Seção Perfil -->
+        <section id="sec-profile" class="hidden">
+            <div class="profile-info">
+                <div class="profile-head">
+                    <div id="profAvatar" class="user-avatar lg">?</div>
+                    <div class="profile-details-flex">
+                        <div class="name-edit-row">
+                            <input type="text" id="nameInput" maxlength="30" placeholder="Seu nome" class="filter-select">
+                            <button class="btn btn-secondary" onclick="saveName()">Salvar</button>
+                        </div>
+                        <div id="profMeta" class="text-muted fs-meta"></div>
+                    </div>
+                    <div class="wallet-box">
+                        <span class="coin-icon">💎</span>
+                        <div>
+                            <div class="wallet-label">Saldo</div>
+                            <span id="profWallet" class="amount">0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="profStats" class="stats-grid"></div>
+
+                <details class="password-details">
+                    <summary>Alterar senha de acesso</summary>
+                    <div class="form-row">
+                        <div class="form-group"><label for="pwCurrent">Senha atual</label><input type="password" id="pwCurrent"></div>
+                        <div class="form-group"><label for="pwNew">Nova senha (mín. 4)</label><input type="password" id="pwNew"></div>
+                        <div class="form-group btn-end-group"><button class="btn" onclick="changePassword()">Alterar</button></div>
+                    </div>
+                </details>
+
+                <h3 class="section-margin">Avaliações recebidas (<span id="revCount">0</span>)</h3>
+                <ul id="reviewsList" class="reviews-list"></ul>
+
+                <div class="profile-actions-bottom">
+                    <button class="btn btn-secondary" onclick="exportData()">Exportar dados</button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">Importar dados</button>
+                    <input type="file" id="importFile" accept=".json" class="d-none" aria-label="Selecionar arquivo de dados para importar" onchange="importData(this)">
+                </div>
+            </div>
+
+            <h2 class="section-title">Meus anúncios</h2>
+            <div id="myItemsGrid" class="grid"></div>
+            
+            <h2 class="section-title">Favoritos</h2>
+            <div id="favItemsGrid" class="grid"></div>
+            
+            <h2 class="section-title">Extrato de Moedas</h2>
+            <div class="table-scroll">
+                <table class="admin-table">
+                    <thead><tr><th>Data</th><th>Movimento</th><th>Descrição</th></tr></thead>
+                    <tbody id="ledgerBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Seção FAQ -->
+        <section id="sec-faq" class="hidden">
+            <h2 class="section-title">Perguntas frequentes</h2>
+            <div id="faqList" class="faq-list"></div>
+        </section>
+
+        <!-- Seção Admin -->
+        <section id="sec-admin" class="hidden">
+            <h2 class="section-title">Painel Administrativo</h2>
+            <div id="admStats" class="stats-grid"></div>
+            
+            <h3 class="section-margin">Negócios recentes</h3>
+            <div class="table-scroll">
+                <table class="admin-table">
+                    <thead><tr><th>ID</th><th>Tipo</th><th>Envolvidos</th><th>Status</th><th>Ações</th></tr></thead>
+                    <tbody id="admTradesTbody"></tbody>
+                </table>
+            </div>
+
+            <h3 class="section-margin">Usuários cadastrados</h3>
+            <div class="table-scroll">
+                <table class="admin-table">
+                    <thead><tr><th>ID</th><th>Nome</th><th>E-mail</th><th>Moedas</th><th>Anúncios</th><th>Papel</th><th>Ações</th></tr></thead>
+                    <tbody id="admUsersTbody"></tbody>
+                </table>
+            </div>
+
+            <h3 class="section-margin">Denúncias</h3>
+            <div class="table-scroll">
+                <table class="admin-table">
+                    <thead><tr><th>ID</th><th>Item</th><th>Denunciante</th><th>Motivo</th><th>Data</th><th>Ações</th></tr></thead>
+                    <tbody id="admDenouncesTbody"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p><strong>EscamboX</strong> – economia de trocas com moedas virtuais</p>
+        <p class="footer-links">
+            <a onclick="showSection('home')">Explorar</a>
+            <a onclick="showSection('ranking')">Ranking</a>
+            <a onclick="showSection('faq')">FAQ</a>
+            <a onclick="alert('EscamboX – plataforma colaborativa de trocas inteligentes.')">Sobre</a>
+        </p>
+    </footer>
+
+    <!-- Modais do Sistema -->
+    <div id="authModal" class="modal">
+        <div class="modal-content small">
+            <button class="close-modal" onclick="closeModal('authModal')">×</button>
+            <div class="auth-tabs">
+                <button id="tabLogin" class="chip active" onclick="switchAuthTab('login')">Entrar</button>
+                <button id="tabReg" class="chip" onclick="switchAuthTab('register')">Criar conta</button>
+            </div>
+            <form id="formLogin" onsubmit="doLogin(event)">
+                <div id="logAlert" class="alert"></div>
+                <div class="form-group"><label for="liEmail">E-mail</label><input type="email" id="liEmail" required class="form-input"></div>
+                <div class="form-group"><label for="liPass">Senha</label><input type="password" id="liPass" required class="form-input"></div>
+                <button type="submit" class="btn mt-1 w-100">Entrar</button>
+                <p class="text-muted fs-xs mt-2 text-center">Demo: maria@example.com / 123</p>
+            </form>
+            <form id="formReg" class="hidden" onsubmit="doRegister(event)">
+                <div id="regAlert" class="alert"></div>
+                <div class="form-group"><label for="rgName">Nome</label><input type="text" id="rgName" maxlength="30" required class="form-input"></div>
+                <div class="form-group"><label for="rgEmail">E-mail</label><input type="email" id="rgEmail" required class="form-input"></div>
+                <div class="form-group"><label for="rgPass">Senha (mín. 4)</label><input type="password" id="rgPass" minlength="4" required class="form-input"></div>
+                <button type="submit" class="btn mt-1 w-100">Criar conta e ganhar 20 moedas</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="itemModal" class="modal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal('itemModal')">×</button>
+            <h2 id="itmHeading" class="mb-3">Publicar item</h2>
+            <form onsubmit="saveItem(event)">
+                <div id="itmAlert" class="alert"></div>
+                <div class="form-group"><label for="fTitle">Título *</label><input type="text" id="fTitle" maxlength="60" required class="form-input"></div>
+                <div class="form-group"><label for="fDesc">Descrição</label><textarea id="fDesc" maxlength="300" class="form-input textarea-vert"></textarea></div>
+                <div class="form-row">
+                    <div class="form-group"><label for="fCat">Categoria</label><select id="fCat" class="form-input"></select></div>
+                    <div class="form-group"><label for="fCond">Condição</label><select id="fCond" class="form-input"><option value="novo">Novo</option><option value="seminovo">Seminovo</option><option value="usado">Usado</option></select></div>
+                </div>
+                <div class="form-group">
+                    <label for="fType">Tipo de negociação</label>
+                    <select id="fType" onchange="onTypeChange()" class="form-input">
+                        <option value="both">Venda ou troca</option>
+                        <option value="sale">Somente venda</option>
+                        <option value="trade">Somente troca</option>
+                    </select>
+                </div>
+                <div class="form-group" id="priceGroup">
+                    <label for="fPrice">Preço em moedas *</label>
+                    <input type="number" id="fPrice" min="0" step="1" value="50" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="fImg">URL da imagem</label>
+                    <input type="url" id="fImg" placeholder="https://..." class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="fImgFile">Ou enviar imagem do dispositivo</label>
+                    <input type="file" id="fImgFile" accept="image/*" onchange="handleImageUpload(this)" class="form-input p-input-file">
+                    <img id="imagePreview" class="preview-image hidden preview-img" alt="Pré-visualização da imagem do item">
+                </div>
+                <div class="form-group">
+                    <label>Localização do item</label>
+                    <div class="location-row">
+                        <input type="text" id="fLocation" placeholder="Cidade ou endereço" class="form-input flex-1">
+                        <button type="button" class="btn btn-secondary" onclick="getLocationFromBrowser()">Usar GPS</button>
+                    </div>
+                    <input type="hidden" id="fLat">
+                    <input type="hidden" id="fLng">
+                    <div id="map" class="map-container"></div>
+                </div>
+                <div class="modal-actions mt-4">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('itemModal')">Cancelar</button>
+                    <button type="submit" class="btn" id="btnSaveItem">Publicar Anúncio</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="detailModal" class="modal">
+        <div class="modal-content" id="detailContent"></div>
+    </div>
+
+    <div id="notifModal" class="modal">
+        <div class="modal-content small">
+            <button class="close-modal" onclick="closeModal('notifModal')">×</button>
+            <h2 class="mb-3">Notificações</h2>
+            <div id="notifList" class="notif-list-container"></div>
+            <button class="btn btn-secondary w-100 mt-2" onclick="clearNotifications()">Limpar tudo</button>
+        </div>
+    </div>
+
+    <div id="ratingModal" class="modal">
+        <div class="modal-content small">
+            <button class="close-modal" onclick="closeModal('ratingModal')">×</button>
+            <h2 class="mb-2">Avaliar contraparte</h2>
+            <div id="rtAlert" class="alert"></div>
+            <p id="rtTarget" class="rt-target-text"></p>
+            <div id="starRow" class="rating-stars mb-3"></div>
+            <textarea id="rtComment" maxlength="140" placeholder="Comentário opcional sobre a negociação" class="form-input textarea-fixed mb-3"></textarea>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('ratingModal')">Depois</button>
+                <button class="btn" onclick="submitRating()">Enviar Avaliação</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="modal">
+        <div class="modal-content small">
+            <h2 id="cfTitle" class="mb-2">Confirmar Ação</h2>
+            <p id="cfText" class="confirm-text"></p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="settleConfirm(false)">Cancelar</button>
+                <button class="btn btn-danger" id="cfYesBtn" onclick="settleConfirm(true)">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chatModal" class="modal">
+        <div class="modal-content small">
+            <button class="close-modal" onclick="closeModal('chatModal')">×</button>
+            <h2 class="mb-3">Negociação & Chat</h2>
+            <div id="chatMessages" class="chat-messages chat-box"></div>
+            <div class="chat-input-row mt-2">
+                <input type="text" id="chatInput" placeholder="Escreva sua mensagem..." maxlength="200" class="form-input">
+                <button class="btn" onclick="sendChatMessage()">Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="denounceModal" class="modal">
+        <div class="modal-content small">
+            <button class="close-modal" onclick="closeModal('denounceModal')">×</button>
+            <h2 class="mb-2">Denunciar anúncio</h2>
+            <p id="denounceTarget" class="rt-target-text"></p>
+            <div class="form-group">
+                <label for="denounceReason">Motivo principal</label>
+                <select id="denounceReason" class="form-input">
+                    <option value="fraude">Fraude ou golpe</option>
+                    <option value="inadequado">Conteúdo inadequado</option>
+                    <option value="spam">Spam ou anúncio repetido</option>
+                    <option value="outro">Outro motivo</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="denounceComment">Detalhes adicionais</label>
+                <textarea id="denounceComment" maxlength="200" class="form-input textarea-fixed"></textarea>
+            </div>
+            <div class="modal-actions mt-3">
+                <button class="btn btn-secondary" onclick="closeModal('denounceModal')">Cancelar</button>
+                <button class="btn btn-danger" onclick="submitDenounce()">Enviar Denúncia</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Scripts do Sistema -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/items.js"></script>
+    <script src="js/trades.js"></script>
+    <script src="js/profile.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/chat.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
