@@ -703,3 +703,95 @@ body {
 .location-row { display: flex; gap: 0.5rem; }
 .rt-target-text { font-weight: 600; margin-bottom: 1rem; }
 .confirm-text { color: var(--text-light); margin-bottom: 1.5rem; }
+
+/* Novos estilos para estrelas, missões e detalhes */
+.rating-stars {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 2rem;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+.rating-star {
+    color: var(--text-muted);
+    transition: color 0.2s, transform 0.2s;
+}
+.rating-star:hover,
+.rating-star.active {
+    color: var(--secondary);
+    transform: scale(1.2);
+}
+
+.mission-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.2rem;
+    box-shadow: var(--shadow-xs);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+.mission-card.mission-available {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+.mission-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+.mission-info strong {
+    font-size: 1rem;
+}
+.mission-info span, .mission-info small {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.detail-media {
+    width: 100%;
+    max-height: 300px;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    margin-bottom: 1rem;
+}
+.detail-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.detail-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+.detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    color: var(--text-light);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+.detail-desc {
+    margin: 1rem 0;
+    line-height: 1.6;
+}
+.detail-owner {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin: 1rem 0;
+    padding: 0.8rem;
+    background: var(--card-alt);
+    border-radius: var(--radius);
+}
+.detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 1rem;
+}
