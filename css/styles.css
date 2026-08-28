@@ -1,5 +1,5 @@
 /* ==========================================================================
-   EscamboX - Estilos Principais (Versão Premium & Polida)
+   EscamboX - Estilos Principais (Versão Premium & Polida v2.1)
    ========================================================================== */
 
 :root {
@@ -78,11 +78,30 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+/* Classe utilitária para esconder visualmente, mantendo acessibilidade */
+.visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+/* Foco visível global para acessibilidade */
+:focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 2px;
+}
+
 /* ==========================================================================
    Topbar & Glassmorphism
    ========================================================================== */
 .topbar {
-    background: color-mix(in srgb, var(--card) 85%, transparent);
+    background: var(--card);
     -webkit-backdrop-filter: blur(16px);
     backdrop-filter: blur(16px);
     padding: 0.8rem 2rem;
@@ -96,7 +115,7 @@ body {
     z-index: 100;
     box-shadow: var(--shadow-sm);
     border-bottom: 1px solid var(--border);
-    transition: background var(--transition);
+    transition: background var(--transition), border-color var(--transition);
 }
 
 .topbar .logo {
@@ -110,6 +129,8 @@ body {
     -webkit-user-select: none;
     user-select: none;
     letter-spacing: -0.5px;
+    background: none;
+    border: none;
 }
 .topbar .logo svg { width: 32px; height: 32px; fill: var(--primary); transition: transform var(--transition); }
 .topbar .logo:hover svg { transform: rotate(-10deg) scale(1.05); }
@@ -158,7 +179,7 @@ body {
 .btn-sell {
     background: linear-gradient(135deg, var(--accent), var(--accent-dark));
     border: none;
-    color: white;
+    color: #FFFFFF;
     font-weight: 600;
     padding: 0.65rem 1.4rem;
     border-radius: 999px;
@@ -211,7 +232,7 @@ body {
     background: linear-gradient(135deg, var(--primary), var(--primary-dark));
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-weight: 600; font-size: 0.95rem; color: white;
+    font-weight: 600; font-size: 0.95rem; color: #FFFFFF;
     box-shadow: 0 2px 8px rgba(109, 40, 217, 0.3);
 }
 .dropdown-content {
@@ -230,6 +251,31 @@ body {
 }
 .user-menu.active .dropdown-content { display: block; }
 
+/* Estilo para itens do dropdown (botões) */
+.dropdown-content button {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0.7rem 1.2rem;
+    text-align: left;
+    color: var(--text);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+}
+.dropdown-content button:hover {
+    background: var(--hover-bg);
+    color: var(--primary);
+}
+.dropdown-content .dropdown-logout {
+    color: var(--danger);
+    font-weight: 600;
+}
+.dropdown-content .dropdown-logout:hover {
+    background: var(--danger-light);
+}
+
 /* ==========================================================================
    Subnav & Navegação Secundária
    ========================================================================== */
@@ -240,32 +286,34 @@ body {
     display: flex;
     gap: 2rem;
     overflow-x: auto;
-    -ms-overflow-style: none;
+    -ms-overflow-style: none; /* IE/Edge */
 }
-.subnav::-webkit-scrollbar { display: none; }
-.subnav a {
+.subnav::-webkit-scrollbar { display: none; /* Chrome/Safari */ }
+.subnav button {
     text-decoration: none;
     color: var(--text-light);
     padding: 0.9rem 0.1rem;
     font-weight: 500;
     font-size: 0.9rem;
     white-space: nowrap;
+    border: none;
     border-bottom: 2px solid transparent;
+    background: none;
     cursor: pointer;
-    transition: color var(--transition);
+    transition: color var(--transition), border-color var(--transition);
 }
-.subnav a:hover { color: var(--primary); }
-.subnav a.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+.subnav button:hover { color: var(--primary); }
+.subnav button.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
 
 /* ==========================================================================
-   Containers, Hero & Grid de Produtos (Efeitos Avançados)
+   Containers, Hero & Grid de Produtos
    ========================================================================== */
 .container { max-width: 1240px; margin: 0 auto; padding: 2rem 1.5rem; flex: 1; width: 100%; }
 .section-title { font-size: 1.5rem; font-weight: 800; margin: 1.5rem 0 1rem; letter-spacing: -0.5px; }
 
 .hero-banner {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-    color: white;
+    color: #FFFFFF;
     border-radius: var(--radius-xl);
     padding: 3rem 2.5rem;
     margin: 0.5rem 0 2rem;
@@ -286,7 +334,7 @@ body {
 }
 .hero-banner h2 { font-size: 2.2rem; font-weight: 800; margin-bottom: 0.5rem; letter-spacing: -0.5px; }
 .hero-banner .btn-hero {
-    background: white; color: var(--primary);
+    background: #FFFFFF; color: var(--primary);
     font-weight: 700; border: none;
     padding: 0.8rem 1.8rem; border-radius: 999px;
     cursor: pointer; transition: all var(--transition);
@@ -321,7 +369,7 @@ body {
     transition: all var(--transition);
 }
 .chip:hover { background: var(--hover-bg); color: var(--text); border-color: var(--text-muted); }
-.chip.active { background: var(--primary); border-color: var(--primary); color: white; box-shadow: 0 2px 8px rgba(109, 40, 217, 0.3); }
+.chip.active { background: var(--primary); border-color: var(--primary); color: #FFFFFF; box-shadow: 0 2px 8px rgba(109, 40, 217, 0.3); }
 
 .grid {
     display: grid;
@@ -374,7 +422,7 @@ body {
 .meta { display: flex; align-items: center; font-size: 0.8rem; color: var(--text-muted); gap: 0.6rem; margin-top: auto; padding-top: 0.5rem; border-top: 1px dashed var(--border); }
 
 /* ==========================================================================
-   Modais & Componentes de Feedback
+   Modais & Feedback
    ========================================================================== */
 .modal {
     display: none;
@@ -389,7 +437,10 @@ body {
     padding: 1.5rem;
     animation: fadeIn 0.2s ease;
 }
-.modal.active { display: flex; }
+/* Sincroniza com gerenciamento de aria-hidden */
+.modal.active {
+    display: flex;
+}
 .modal-content {
     background: var(--card);
     border-radius: var(--radius-xl);
@@ -403,13 +454,13 @@ body {
     border: 1px solid var(--border);
 }
 .modal-content.small { max-width: 440px; }
-.close-modal { float: right; cursor: pointer; font-size: 1.8rem; color: var(--text-muted); border: none; background: none; transition: color var(--transition); }
+.close-modal { float: right; cursor: pointer; font-size: 1.8rem; color: var(--text-muted); border: none; background: none; transition: color var(--transition), transform var(--transition); }
 .close-modal:hover { color: var(--danger); transform: scale(1.1); }
 
 /* Botões Padronizados */
 .btn {
     background: var(--primary);
-    color: white;
+    color: #FFFFFF;
     border: none;
     padding: 0.75rem 1.5rem;
     border-radius: var(--radius);
@@ -426,7 +477,7 @@ body {
 .btn-secondary:hover { background: var(--hover-bg); border-color: var(--text-muted); }
 .btn-danger { background: var(--danger); box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25); }
 .btn-danger:hover { background: #DC2626; box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4); }
-.btn-warning { background: var(--secondary); color: #000; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25); }
+.btn-warning { background: var(--secondary); color: #000000; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25); }
 .btn-warning:hover { background: #D97706; }
 
 /* Alertas Estilizados */
@@ -499,7 +550,7 @@ body {
 .toast.info { border-left-color: var(--info); }
 
 /* ==========================================================================
-   Keyframe Animations & Responsividade
+   Keyframes & Responsividade
    ========================================================================== */
 @keyframes slideUp { 
     from { opacity: 0; transform: translateY(15px); } 
@@ -527,9 +578,8 @@ body {
 }
 
 /* ==========================================================================
-   Complementos de Componentes (Formulários, Carteira, Estatísticas, etc.)
+   Componentes Complementares
    ========================================================================== */
-
 .form-input, select.form-input, textarea.form-input {
     width: 100%;
     padding: 0.75rem 1rem;
@@ -626,7 +676,7 @@ body {
 }
 .list-toggle-btn.active, .list-toggle-btn:hover {
     background: var(--primary);
-    color: white;
+    color: #FFFFFF;
     border-color: var(--primary);
 }
 
@@ -663,7 +713,7 @@ body {
     width: 100%;
     background: transparent;
     border: none;
-    padding: 0.7rem 1rem;
+    padding: 0.7rem 1.2rem;
     text-align: left;
     color: var(--danger);
     font-weight: 600;
@@ -673,9 +723,8 @@ body {
 .dropdown-logout:hover { background: var(--danger-light); }
 
 /* ==========================================================================
-   Classes Utilitárias de Suporte (Substituição de estilos inline)
+   Classes Utilitárias de Suporte
    ========================================================================== */
-
 .fw-bold { font-weight: 700; }
 .fs-sm { font-size: 0.8rem; }
 .fs-xs { font-size: 0.78rem; }
@@ -704,7 +753,7 @@ body {
 .rt-target-text { font-weight: 600; margin-bottom: 1rem; }
 .confirm-text { color: var(--text-light); margin-bottom: 1.5rem; }
 
-/* Novos estilos para estrelas, missões e detalhes */
+/* Estrelas e Detalhes */
 .rating-stars {
     display: flex;
     gap: 0.5rem;
@@ -723,34 +772,6 @@ body {
     transform: scale(1.2);
 }
 
-.mission-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 1.2rem;
-    box-shadow: var(--shadow-xs);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-}
-.mission-card.mission-available {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent);
-}
-.mission-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-}
-.mission-info strong {
-    font-size: 1rem;
-}
-.mission-info span, .mission-info small {
-    color: var(--text-muted);
-    font-size: 0.85rem;
-}
-
 .detail-media {
     width: 100%;
     max-height: 300px;
@@ -758,16 +779,8 @@ body {
     border-radius: var(--radius-lg);
     margin-bottom: 1rem;
 }
-.detail-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-.detail-title {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-}
+.detail-image { width: 100%; height: 100%; object-fit: cover; }
+.detail-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
 .detail-meta {
     display: flex;
     flex-wrap: wrap;
@@ -776,10 +789,7 @@ body {
     font-size: 0.9rem;
     margin-bottom: 1rem;
 }
-.detail-desc {
-    margin: 1rem 0;
-    line-height: 1.6;
-}
+.detail-desc { margin: 1rem 0; line-height: 1.6; }
 .detail-owner {
     display: flex;
     align-items: center;
@@ -789,9 +799,40 @@ body {
     background: var(--card-alt);
     border-radius: var(--radius);
 }
-.detail-actions {
+.detail-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
+
+.empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+}
+
+/* Filtro de Localização */
+.filter-row-location {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.6rem;
-    margin-top: 1rem;
+    width: 100%;
+    margin-top: 0.6rem;
+}
+
+.location-search-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.location-input {
+    min-width: 180px;
+    flex: 1;
+}
+
+.location-display {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    font-weight: 500;
 }
