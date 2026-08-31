@@ -264,10 +264,19 @@
             <h2 id="adminTitle" class="section-title">Painel Administrativo</h2>
             <div id="admStats" class="stats-grid"></div>
             
-            <h3 class="section-margin">Negócios recentes</h3>
+            <h3 class="section-margin">Negócios / Escambos</h3>
             <div class="table-scroll">
                 <table class="admin-table">
-                    <thead><tr><th scope="col">ID</th><th scope="col">Tipo</th><th scope="col">Envolvidos</th><th scope="col">Item</th><th scope="col">Status</th><th scope="col">Ações</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th scope="col">ID</th>
+                            <th scope="col">Tipo</th>
+                            <th scope="col">Envolvidos</th>
+                            <th scope="col">Detalhe</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Ações</th>
+                        </tr>
+                    </thead>
                     <tbody id="admTradesTbody"></tbody>
                 </table>
             </div>
@@ -275,15 +284,52 @@
             <h3 class="section-margin">Usuários cadastrados</h3>
             <div class="table-scroll">
                 <table class="admin-table">
-                    <thead><tr><th scope="col">ID</th><th scope="col">Nome</th><th scope="col">E-mail</th><th scope="col">Moedas</th><th scope="col">Anúncios</th><th scope="col">Papel</th><th scope="col">Ações</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th scope="col">ID</th>
+                            <th scope="col">Nome</th>
+                            <th scope="col">E-mail / Local</th>
+                            <th scope="col">Moedas</th>
+                            <th scope="col">Anúncios</th>
+                            <th scope="col">Papel</th>
+                            <th scope="col">Ações</th>
+                        </tr>
+                    </thead>
                     <tbody id="admUsersTbody"></tbody>
+                </table>
+            </div>
+
+            <h3 class="section-margin">Todos os anúncios</h3>
+            <div class="table-scroll">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">ID</th>
+                            <th scope="col">Título</th>
+                            <th scope="col">Dono</th>
+                            <th scope="col">Tipo</th>
+                            <th scope="col">Preço</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admItemsTbody"></tbody>
                 </table>
             </div>
 
             <h3 class="section-margin">Denúncias</h3>
             <div class="table-scroll">
                 <table class="admin-table">
-                    <thead><tr><th scope="col">ID</th><th scope="col">Item</th><th scope="col">Denunciante</th><th scope="col">Motivo</th><th scope="col">Data</th><th scope="col">Ações</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th scope="col">ID</th>
+                            <th scope="col">Item</th>
+                            <th scope="col">Denunciante</th>
+                            <th scope="col">Motivo</th>
+                            <th scope="col">Data</th>
+                            <th scope="col">Ações</th>
+                        </tr>
+                    </thead>
                     <tbody id="admDenouncesTbody"></tbody>
                 </table>
             </div>

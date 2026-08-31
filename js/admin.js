@@ -1,11 +1,10 @@
 'use strict';
 
-// Painel administrativo com auto-refresh para demonstração
+// Painel administrativo (root) – usuários, itens, negócios e denúncias
 let adminRefreshInterval = null;
 
 /**
  * Inicia o auto-refresh do painel admin (a cada 5 segundos)
- * O intervalo só executa se a seção admin estiver visível.
  */
 function startAdminAutoRefresh() {
     if (adminRefreshInterval) {
@@ -14,19 +13,14 @@ function startAdminAutoRefresh() {
     }
     adminRefreshInterval = setInterval(() => {
         const adminSection = document.getElementById('sec-admin');
-        // Só atualiza se a seção admin estiver visível e não estiver oculta
         if (adminSection && !adminSection.classList.contains('hidden')) {
             renderAdmin();
         } else {
-            // Se saiu da seção admin, para o intervalo
             stopAdminAutoRefresh();
         }
-    }, 5000); // 5 segundos
+    }, 5000);
 }
 
-/**
- * Para o auto-refresh do admin
- */
 function stopAdminAutoRefresh() {
     if (adminRefreshInterval) {
         clearInterval(adminRefreshInterval);
@@ -35,31 +29,35 @@ function stopAdminAutoRefresh() {
 }
 
 /**
- * Renderiza o painel administrativo.
- * Só executa se o usuário logado for admin e não estiver banido.
- * Inicia o auto-refresh se ainda não estiver rodando.
+ * Renderiza o painel administrativo completo
  */
 function renderAdmin() {
-    const currentUser = getCurrentUser();
-    if (!currentUser || currentUser.role !== 'admin' || currentUser.role === 'banned') {
+    if (!currentUser || currentUser.role !== 'admin') {
         showToast('Acesso negado.', 'error');
         return;
     }
 
     try {
-        // Estatísticas gerais
-        document.getElementById('admStats').innerHTML = `
-            <div class="stat-card"><div class="stat-value">${DB.users.length}</div><div class="stat-label">Usuários</div></div>
-            <div class="stat-card"><div class="stat-value">${DB.items.length}</div><div class="stat-label">Itens</div></div>
-            <div class="stat-card"><div class="stat-value">${DB.trades.length}</div><div class="stat-label">Negócios</div></div>
-            <div class="stat-card"><div class="stat-value">${DB.denounces.length}</div><div class="stat-label">Denúncias</div></div>
-        `;
+        const availableItems = DB.items.filter(i => i.status === 'available').length;
+        const pendingTrades = DB.trades.filter(t => t.status === 'pending').length;
+        const completedTrades = DB.trades.filter(t => t.status === 'completed').length;
+
+        const statsEl = document.getElementById('admStats');
+        if (statsEl) {
+            statsEl.innerHTML = `
+                <div class="stat-card"><div class="stat-value">${DB.users.length}</div><div class="stat-label">Usuários</div></div>
+                <div class="stat-card"><div class="stat-value">${DB.items.length}</div><div class="stat-label">Itens (${availableItems} disp.)</div></div>
+                <div class="stat-card"><div class="stat-value">${DB.trades.length}</div><div class="stat-label">Negócios (${pendingTrades} pend.)</div></div>
+                <div class="stat-card"><div class="stat-value">${completedTrades}</div><div class="stat-label">Escambos concluídos</div></div>
+                <div class="stat-card"><div class="stat-value">${DB.denounces.length}</div><div class="stat-label">Denúncias</div></div>
+            `;
+        }
 
         renderAdminTrades();
         renderAdminUsers();
+        renderAdminItems();
         renderAdminDenounces();
 
-        // Inicia auto-refresh se ainda não estiver rodando
         if (!adminRefreshInterval) {
             startAdminAutoRefresh();
         }
@@ -70,49 +68,65 @@ function renderAdmin() {
 }
 
 /**
- * Renderiza a tabela de negócios no admin.
- * Inclui um botão "Atualizar" para refresh manual.
+ * Tabela de todos os negócios / escambos
  */
 function renderAdminTrades() {
     const tbody = document.getElementById('admTradesTbody');
     if (!tbody) return;
 
-    tbody.innerHTML = DB.trades.map(t => {
+    if (!DB.trades.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-muted">Nenhum negócio registrado.</td></tr>';
+        return;
+    }
+
+    const statusLabel = {
+        pending: 'Pendente',
+        completed: 'Concluído',
+        rejected: 'Recusado',
+        cancelled: 'Cancelado',
+        admin_cancelled: 'Estornado'
+    };
+
+    // Mais recentes primeiro
+    const sorted = [...DB.trades].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    tbody.innerHTML = sorted.map(t => {
         const proposer = getUser(t.proposerId);
         const receiver = getUser(t.receiverId);
-        const item = getItem(t.receiverItemId) || getItem(t.proposerItemId);
-        const statusLabel = {
-            pending: 'Pendente',
-            completed: 'Concluído',
-            rejected: 'Recusado',
-            cancelled: 'Cancelado',
-            admin_cancelled: 'Estornado'
-        }[t.status] || t.status;
+        const wanted = getItem(t.receiverItemId);
+        const offered = t.proposerItemId ? getItem(t.proposerItemId) : null;
 
-        // Botão de estorno só para negócios pendentes ou concluídos
-        const canCancel = (t.status === 'pending' || t.status === 'completed');
+        let typeLabel = 'Troca';
+        let detail = '';
+        if (t.type === 'purchase' || (!t.proposerItemId && t.coins > 0)) {
+            typeLabel = 'Moedas';
+            detail = `🪙 ${fmt(t.coins)} → "${wanted ? esc(wanted.title) : '?'}"`;
+        } else {
+            detail = `"${offered ? esc(offered.title) : '?'}"`;
+            if (t.coins > 0) detail += ` + 🪙 ${fmt(t.coins)}`;
+            detail += ` ⇄ "${wanted ? esc(wanted.title) : '?'}"`;
+        }
+
+        const canCancel = t.status === 'pending' || t.status === 'completed';
         const actionButton = canCancel
-            ? `<button class="btn btn-danger" onclick="adminCancelTrade(${t.id})" data-action="cancel-trade">Estornar</button>`
-            : '';
+            ? `<button class="btn btn-danger" type="button" onclick="adminCancelTrade(${t.id})">Estornar</button>`
+            : '—';
 
         return `
             <tr>
                 <td>#${t.id}</td>
-                <td>${t.type === 'purchase' ? 'Compra' : 'Troca'}</td>
+                <td>${typeLabel}</td>
                 <td>${esc(proposer?.name || '?')} → ${esc(receiver?.name || '?')}</td>
-                <td>${esc(item?.title || 'Item removido')}</td>
-                <td>${statusLabel}</td>
+                <td>${detail}</td>
+                <td>${statusLabel[t.status] || t.status}</td>
                 <td>${actionButton}</td>
             </tr>
         `;
     }).join('');
-
-    // Adiciona um botão "Atualizar" acima da tabela (opcional)
-    // Mas já temos o auto-refresh, então não é necessário.
 }
 
 /**
- * Renderiza a tabela de usuários no admin.
+ * Tabela de usuários – excluir, banir, desbanir, ajustar moedas
  */
 function renderAdminUsers() {
     const tbody = document.getElementById('admUsersTbody');
@@ -121,56 +135,71 @@ function renderAdminUsers() {
     tbody.innerHTML = DB.users.map(u => {
         const roleLabel = { user: 'Usuário', admin: 'Admin', banned: 'Banido' }[u.role] || u.role;
         const itemCount = DB.items.filter(i => i.ownerId === u.id).length;
+        const loc = u.location ? esc(u.location) : '—';
 
         let actionButtons = '';
         if (u.role !== 'admin') {
-            actionButtons += `<button class="btn btn-danger" onclick="adminDeleteUser(${u.id})" data-action="delete-user">Excluir</button> `;
+            actionButtons += `<button class="btn btn-danger" type="button" onclick="adminDeleteUser(${u.id})">Excluir</button> `;
+            actionButtons += `<button class="btn btn-secondary" type="button" onclick="adminAdjustCoins(${u.id})">Moedas</button> `;
         }
         if (u.role === 'user') {
-            actionButtons += `<button class="btn btn-warning" onclick="adminBanUser(${u.id})" data-action="ban-user">Banir</button>`;
+            actionButtons += `<button class="btn btn-warning" type="button" onclick="adminBanUser(${u.id})">Banir</button>`;
         } else if (u.role === 'banned') {
-            actionButtons += `<button class="btn btn-secondary" onclick="adminUnbanUser(${u.id})" data-action="unban-user">Desbanir</button>`;
+            actionButtons += `<button class="btn btn-secondary" type="button" onclick="adminUnbanUser(${u.id})">Desbanir</button>`;
         }
 
         return `
             <tr>
                 <td>${u.id}</td>
                 <td>${esc(u.name)}</td>
-                <td>${esc(u.email)}</td>
-                <td>${fmt(u.coins)}</td>
+                <td>${esc(u.email)}<br><small class="text-muted">${loc}</small></td>
+                <td>🪙 ${fmt(u.coins)}</td>
                 <td>${itemCount}</td>
                 <td>${roleLabel}</td>
-                <td>${actionButtons}</td>
+                <td>${actionButtons || '—'}</td>
             </tr>
         `;
     }).join('');
 }
 
 /**
- * Renderiza a tabela de denúncias no admin.
+ * Tabela de todos os anúncios – remover qualquer publicação
  */
-function renderAdminDenounces() {
-    const tbody = document.getElementById('admDenouncesTbody');
+function renderAdminItems() {
+    const tbody = document.getElementById('admItemsTbody');
     if (!tbody) return;
 
-    tbody.innerHTML = DB.denounces.map(d => {
-        const item = getItem(d.itemId);
-        const reporter = getUser(d.reporterId);
+    if (!DB.items.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-muted">Nenhum anúncio.</td></tr>';
+        return;
+    }
 
-        const removeButton = item
-            ? `<button class="btn btn-danger" onclick="adminRemoveItem(${d.itemId})" data-action="remove-item">Remover item</button>`
-            : '';
+    const statusLabel = {
+        available: 'Disponível',
+        reserved: 'Reservado',
+        sold: 'Concluído',
+        unavailable: 'Indisponível'
+    };
+
+    const sorted = [...DB.items].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    tbody.innerHTML = sorted.map(i => {
+        const owner = getUser(i.ownerId);
+        const typeLabel = (i.price > 0 && i.type !== 'trade')
+            ? (i.acceptTrades ? 'Moedas/Troca' : 'Moedas')
+            : 'Troca';
+        const price = i.price > 0 ? `🪙 ${fmt(i.price)}` : '—';
 
         return `
             <tr>
-                <td>#${d.id}</td>
-                <td>${item ? esc(item.title) : 'Item removido'}</td>
-                <td>${reporter ? esc(reporter.name) : 'Usuário removido'}</td>
-                <td>${esc(d.reason)}</td>
-                <td>${fmtDate(d.createdAt)}</td>
+                <td>#${i.id}</td>
+                <td>${esc(i.title)}</td>
+                <td>${owner ? esc(owner.name) : '?'}</td>
+                <td>${typeLabel}</td>
+                <td>${price}</td>
+                <td>${statusLabel[i.status] || i.status}</td>
                 <td>
-                    ${removeButton}
-                    <button class="btn btn-secondary" onclick="adminIgnoreDenounce(${d.id})" data-action="ignore-denounce">Ignorar</button>
+                    <button class="btn btn-danger" type="button" onclick="adminRemoveItem(${i.id})">Excluir</button>
                 </td>
             </tr>
         `;
@@ -178,7 +207,43 @@ function renderAdminDenounces() {
 }
 
 /**
- * Estorna um negócio, devolvendo moedas e itens.
+ * Tabela de denúncias
+ */
+function renderAdminDenounces() {
+    const tbody = document.getElementById('admDenouncesTbody');
+    if (!tbody) return;
+
+    if (!DB.denounces.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-muted">Nenhuma denúncia.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = DB.denounces.map(d => {
+        const item = getItem(d.itemId);
+        const reporter = getUser(d.reporterId);
+
+        const removeButton = item
+            ? `<button class="btn btn-danger" type="button" onclick="adminRemoveItem(${d.itemId})">Remover item</button>`
+            : '';
+
+        return `
+            <tr>
+                <td>#${d.id}</td>
+                <td>${item ? esc(item.title) : 'Item removido'}</td>
+                <td>${reporter ? esc(reporter.name) : 'Usuário removido'}</td>
+                <td>${esc(d.reason)}${d.comment ? `<br><small class="text-muted">${esc(d.comment)}</small>` : ''}</td>
+                <td>${typeof fmtDate === 'function' ? fmtDate(d.createdAt) : new Date(d.createdAt).toLocaleDateString('pt-BR')}</td>
+                <td>
+                    ${removeButton}
+                    <button class="btn btn-secondary" type="button" onclick="adminIgnoreDenounce(${d.id})">Ignorar</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+/**
+ * Estorna negócio (devolve moedas e itens)
  */
 function adminCancelTrade(tradeId) {
     const t = DB.trades.find(x => x.id === tradeId);
@@ -186,26 +251,22 @@ function adminCancelTrade(tradeId) {
         showToast('Negócio não encontrado.', 'error');
         return;
     }
-
     if (t.status === 'admin_cancelled' || t.status === 'cancelled') {
         showToast('Este negócio já foi cancelado.', 'warning');
         return;
     }
 
-    askConfirm('Estornar negócio', 'Deseja realmente estornar este negócio? Itens e moedas serão devolvidos.', () => {
+    askConfirm('Estornar negócio', 'Deseja estornar? Itens e moedas serão devolvidos aos donos originais.', () => {
         try {
-            // Reverter moedas (se houver)
             if (t.coinMoves && t.coinMoves.length) {
                 t.coinMoves.forEach(move => {
                     const user = getUser(move.userId);
                     if (user) {
-                        // Inverte o delta: se foi +X, agora -X; se foi -X, agora +X
                         changeCoins(user, -move.delta, `Estorno de negócio #${t.id}`);
                     }
                 });
             }
 
-            // Devolver itens aos donos originais (snapshots)
             if (t.snapshots && t.snapshots.length) {
                 t.snapshots.forEach(snap => {
                     const item = getItem(snap.itemId);
@@ -214,13 +275,23 @@ function adminCancelTrade(tradeId) {
                         item.status = 'available';
                     }
                 });
+            } else {
+                // Fallback se não houver snapshot
+                if (t.proposerItemId) {
+                    const pi = getItem(t.proposerItemId);
+                    if (pi) { pi.ownerId = t.proposerId; pi.status = 'available'; }
+                }
+                if (t.receiverItemId) {
+                    const ri = getItem(t.receiverItemId);
+                    if (ri) { ri.ownerId = t.receiverId; ri.status = 'available'; }
+                }
             }
 
             t.status = 'admin_cancelled';
             save();
             renderAdmin();
             renderAll();
-            showToast('Negócio estornado com sucesso.', 'warning');
+            showToast('Negócio estornado.', 'warning');
         } catch (error) {
             console.error('Erro ao estornar negócio:', error);
             showToast('Erro ao estornar negócio.', 'error');
@@ -229,7 +300,30 @@ function adminCancelTrade(tradeId) {
 }
 
 /**
- * Exclui um usuário e todos os dados associados.
+ * Ajusta saldo de moedas de um usuário (root)
+ */
+function adminAdjustCoins(userId) {
+    const u = getUser(userId);
+    if (!u || u.role === 'admin') {
+        showToast('Não é possível alterar este usuário.', 'error');
+        return;
+    }
+    const input = prompt(`Saldo atual de ${u.name}: ${u.coins} moedas.\nInforme o NOVO saldo:`, String(u.coins));
+    if (input === null) return;
+    const newBalance = parseInt(input, 10);
+    if (isNaN(newBalance) || newBalance < 0) {
+        showToast('Valor inválido.', 'error');
+        return;
+    }
+    const delta = newBalance - u.coins;
+    changeCoins(u, delta, `Ajuste administrativo`);
+    save();
+    renderAdmin();
+    showToast(`Saldo de ${u.name} atualizado para ${fmt(newBalance)} moedas.`, 'success');
+}
+
+/**
+ * Exclui usuário e dados associados
  */
 function adminDeleteUser(userId) {
     const u = getUser(userId);
@@ -240,32 +334,22 @@ function adminDeleteUser(userId) {
 
     askConfirm('Excluir usuário', `Excluir ${u.name}? Todos os dados relacionados serão removidos.`, () => {
         try {
-            // Remover itens do usuário
             DB.items = DB.items.filter(i => i.ownerId !== userId);
-
-            // Remover negociações do usuário
             DB.trades = DB.trades.filter(t => t.proposerId !== userId && t.receiverId !== userId);
-
-            // Remover mensagens de chat envolvendo o usuário
-            DB.chats = DB.chats.filter(c => !c.participants.includes(userId));
-
-            // Remover denúncias feitas pelo usuário
+            if (DB.chats) DB.chats = DB.chats.filter(c => !(c.participants || []).includes(userId));
             DB.denounces = DB.denounces.filter(d => d.reporterId !== userId);
+            if (DB.ledger) DB.ledger = DB.ledger.filter(l => l.userId !== userId);
 
-            // Remover entradas do ledger
-            DB.ledger = DB.ledger.filter(l => l.userId !== userId);
+            // Remove avaliações feitas por/para este usuário
+            DB.users.forEach(usr => {
+                if (Array.isArray(usr.ratings)) {
+                    usr.ratings = usr.ratings.filter(r => r.by !== userId);
+                }
+                if (Array.isArray(usr.favs)) {
+                    // favs são IDs de itens; limpeza de itens já removeu os dele
+                }
+            });
 
-            // Remover favoritos que referenciam este usuário (se houver)
-            if (DB.favorites) {
-                DB.favorites = DB.favorites.filter(f => f.userId !== userId);
-            }
-
-            // Remover avaliações feitas ou recebidas pelo usuário (se existirem)
-            if (DB.reviews) {
-                DB.reviews = DB.reviews.filter(r => r.fromUserId !== userId && r.toUserId !== userId);
-            }
-
-            // Remover usuário
             DB.users = DB.users.filter(x => x.id !== userId);
 
             save();
@@ -280,7 +364,7 @@ function adminDeleteUser(userId) {
 }
 
 /**
- * Bane um usuário, impedindo login e ocultando seus itens.
+ * Bane usuário
  */
 function adminBanUser(userId) {
     const u = getUser(userId);
@@ -292,24 +376,22 @@ function adminBanUser(userId) {
     askConfirm('Banir usuário', `Banir ${u.name}? Ele não poderá mais fazer login.`, () => {
         try {
             u.role = 'banned';
-
-            // Ocultar itens do usuário
-            DB.items.filter(i => i.ownerId === userId).forEach(i => i.status = 'unavailable');
-
-            // Cancelar negociações pendentes envolvendo o usuário
-            DB.trades.filter(t => (t.proposerId === userId || t.receiverId === userId) && t.status === 'pending')
+            DB.items.filter(i => i.ownerId === userId).forEach(i => {
+                if (i.status === 'available') i.status = 'unavailable';
+            });
+            DB.trades
+                .filter(t => (t.proposerId === userId || t.receiverId === userId) && t.status === 'pending')
                 .forEach(t => {
                     t.status = 'cancelled';
-                    // Liberar itens reservados
-                    if (t.type === 'trade') {
-                        const otherItemId = t.proposerId === userId ? t.receiverItemId : t.proposerItemId;
-                        const otherItem = getItem(otherItemId);
-                        if (otherItem && otherItem.status === 'reserved') {
-                            otherItem.status = 'available';
-                        }
+                    if (t.proposerItemId) {
+                        const pi = getItem(t.proposerItemId);
+                        if (pi && pi.status === 'reserved') pi.status = 'available';
+                    }
+                    if (t.receiverItemId) {
+                        const ri = getItem(t.receiverItemId);
+                        if (ri && ri.status === 'reserved') ri.status = 'available';
                     }
                 });
-
             save();
             renderAdmin();
             renderAll();
@@ -322,7 +404,7 @@ function adminBanUser(userId) {
 }
 
 /**
- * Desbane um usuário, restaurando seu acesso e itens.
+ * Desbane usuário
  */
 function adminUnbanUser(userId) {
     const u = getUser(userId);
@@ -334,11 +416,9 @@ function adminUnbanUser(userId) {
     askConfirm('Desbanir usuário', `Permitir que ${u.name} volte a usar a plataforma?`, () => {
         try {
             u.role = 'user';
-
-            // Reativar itens do usuário que estavam indisponíveis por banimento
-            DB.items.filter(i => i.ownerId === userId && i.status === 'unavailable')
-                .forEach(i => i.status = 'available');
-
+            DB.items
+                .filter(i => i.ownerId === userId && i.status === 'unavailable')
+                .forEach(i => { i.status = 'available'; });
             save();
             renderAdmin();
             renderAll();
@@ -351,7 +431,7 @@ function adminUnbanUser(userId) {
 }
 
 /**
- * Remove um item e cancela negociações pendentes relacionadas.
+ * Remove anúncio e cancela negociações pendentes
  */
 function adminRemoveItem(itemId) {
     const item = getItem(itemId);
@@ -362,30 +442,29 @@ function adminRemoveItem(itemId) {
 
     askConfirm('Remover item', `Remover "${item.title}"? Negociações pendentes serão canceladas.`, () => {
         try {
-            // Cancelar negociações pendentes envolvendo este item
-            DB.trades.filter(t => (t.receiverItemId === itemId || t.proposerItemId === itemId) && t.status === 'pending')
+            DB.trades
+                .filter(t => (t.receiverItemId === itemId || t.proposerItemId === itemId) && t.status === 'pending')
                 .forEach(t => {
                     t.status = 'cancelled';
-                    // Liberar o outro item se for troca
-                    if (t.type === 'trade') {
-                        const otherItemId = t.receiverItemId === itemId ? t.proposerItemId : t.receiverItemId;
-                        const otherItem = getItem(otherItemId);
-                        if (otherItem && otherItem.status === 'reserved') {
-                            otherItem.status = 'available';
-                        }
+                    if (t.proposerItemId && t.proposerItemId !== itemId) {
+                        const other = getItem(t.proposerItemId);
+                        if (other && other.status === 'reserved') other.status = 'available';
+                    }
+                    if (t.receiverItemId && t.receiverItemId !== itemId) {
+                        const other = getItem(t.receiverItemId);
+                        if (other && other.status === 'reserved') other.status = 'available';
                     }
                 });
 
-            // Remover item
             DB.items = DB.items.filter(i => i.id !== itemId);
-
-            // Remover denúncias associadas
             DB.denounces = DB.denounces.filter(d => d.itemId !== itemId);
 
-            // Remover favoritos associados ao item (se houver)
-            if (DB.favorites) {
-                DB.favorites = DB.favorites.filter(f => f.itemId !== itemId);
-            }
+            // Remove dos favoritos dos usuários
+            DB.users.forEach(u => {
+                if (Array.isArray(u.favs)) {
+                    u.favs = u.favs.filter(fid => fid !== itemId);
+                }
+            });
 
             save();
             renderAdmin();
@@ -399,7 +478,7 @@ function adminRemoveItem(itemId) {
 }
 
 /**
- * Ignora uma denúncia, removendo-a da lista.
+ * Ignora denúncia
  */
 function adminIgnoreDenounce(denounceId) {
     const d = DB.denounces.find(x => x.id === denounceId);
@@ -408,7 +487,7 @@ function adminIgnoreDenounce(denounceId) {
         return;
     }
 
-    askConfirm('Ignorar denúncia', 'Deseja marcar esta denúncia como analisada e removê-la da lista?', () => {
+    askConfirm('Ignorar denúncia', 'Marcar esta denúncia como analisada e removê-la da lista?', () => {
         try {
             DB.denounces = DB.denounces.filter(x => x.id !== denounceId);
             save();
@@ -421,7 +500,6 @@ function adminIgnoreDenounce(denounceId) {
     });
 }
 
-// Para parar o auto-refresh quando a página for fechada ou recarregada
-window.addEventListener('beforeunload', function() {
+window.addEventListener('beforeunload', function () {
     stopAdminAutoRefresh();
 });
