@@ -56,7 +56,6 @@
                     <div class="dropdown-divider"></div>
                     <button role="menuitem" onclick="showSection('profile'); closeUserMenu();" type="button">Meu perfil</button>
                     <button role="menuitem" onclick="showSection('trades'); closeUserMenu();" type="button">Meus negócios</button>
-                    <!-- Missões removido -->
                     <button role="menuitem" onclick="showSection('ranking'); closeUserMenu();" type="button">Ranking</button>
                     <button role="menuitem" onclick="showSection('faq'); closeUserMenu();" type="button">FAQ</button>
                     <button id="ddAdminLink" role="menuitem" class="hidden" onclick="showSection('admin'); closeUserMenu();" type="button">Painel admin</button>
@@ -84,7 +83,6 @@
         <button data-section="trades" class="auth-only hidden" onclick="showSection('trades')" type="button">
             Negócios <span id="navPending"></span>
         </button>
-        <!-- Missões removido -->
         <button data-section="ranking" onclick="showSection('ranking')" type="button">Ranking</button>
         <button data-section="profile" class="auth-only hidden" onclick="showSection('profile')" type="button">Perfil</button>
         <button data-section="faq" onclick="showSection('faq')" type="button">FAQ</button>
@@ -102,8 +100,10 @@
                 <button class="btn-hero" onclick="heroCta()" type="button">Começar Agora</button>
             </div>
 
+            <!-- BARRA DE FILTROS (sem a grade dentro) -->
             <div class="filters-bar">
                 <div id="catChips" class="chip-row" role="group" aria-label="Filtrar por categoria"></div>
+                
                 <div class="filter-row-top">
                     <label for="selType" class="visually-hidden">Tipo de anúncio</label>
                     <select id="selType" class="filter-select" onchange="setFilter('type', this.value)">
@@ -133,30 +133,32 @@
                 </div>
 
                 <div class="filter-row-bottom">
-                <div class="location-search-group">
-                    <label for="searchLocationInput" class="visually-hidden">Buscar local</label>
-                    <input type="text" id="searchLocationInput" class="filter-select location-input" 
-                        placeholder="Cidade ou endereço..." aria-label="Buscar por cidade ou endereço">
-                    <button class="btn btn-secondary" onclick="searchLocationByAddress()" type="button">Buscar</button>
-                    <button class="btn btn-secondary" onclick="useMyLocation()" type="button">Usar GPS</button>
-                    <button class="btn btn-secondary" onclick="openMapPicker()" type="button">Mapa</button>
-                    <button class="btn btn-secondary" onclick="clearSearchLocation()" type="button" 
-                            title="Limpar localização" aria-label="Limpar localização">✕</button>
+                    <div class="location-search-group">
+                        <label for="searchLocationInput" class="visually-hidden">Buscar local</label>
+                        <input type="text" id="searchLocationInput" class="filter-select location-input" 
+                            placeholder="Cidade ou endereço..." aria-label="Buscar por cidade ou endereço">
+                        <button class="btn btn-secondary" onclick="searchLocationByAddress()" type="button">Buscar</button>
+                        <button class="btn btn-secondary" onclick="useMyLocation()" type="button">Usar GPS</button>
+                        <button class="btn btn-secondary" onclick="openMapPicker()" type="button">Mapa</button>
+                        <button class="btn btn-secondary" onclick="clearSearchLocation()" type="button" 
+                                title="Limpar localização" aria-label="Limpar localização">✕</button>
+                    </div>
+                    <div class="location-radius-group">
+                        <label for="selRadius" class="visually-hidden">Raio de distância</label>
+                        <select id="selRadius" class="filter-select" onchange="setRadius(this.value)">
+                            <option value="0">Raio: qualquer</option>
+                            <option value="5">5 km</option>
+                            <option value="10">10 km</option>
+                            <option value="20">20 km</option>
+                            <option value="50">50 km</option>
+                            <option value="100">100 km</option>
+                        </select>
+                    </div>
+                    <span id="selectedLocationDisplay" class="location-display"></span>
                 </div>
-                <div class="location-radius-group">
-                    <label for="selRadius" class="visually-hidden">Raio de distância</label>
-                    <select id="selRadius" class="filter-select" onchange="setRadius(this.value)">
-                        <option value="0">Raio: qualquer</option>
-                        <option value="5">5 km</option>
-                        <option value="10">10 km</option>
-                        <option value="20">20 km</option>
-                        <option value="50">50 km</option>
-                        <option value="100">100 km</option>
-                    </select>
-                </div>
-                <span id="selectedLocationDisplay" class="location-display"></span>
             </div>
 
+            <!-- GRADE DE ITENS – fora da barra de filtros (layout horizontal) -->
             <div id="itemsGrid" class="grid" aria-live="polite"></div>
             <div id="loadMoreSentinel" class="sentinel" aria-hidden="true"></div>
         </section>
@@ -213,11 +215,11 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label for="pwCurrent">Senha atual</label>
-                            <input type="password" id="pwCurrent" autocomplete="current-password">
+                            <input type="password" id="pwCurrent" autocomplete="current-password" class="form-input">
                         </div>
                         <div class="form-group">
                             <label for="pwNew">Nova senha (mín. 4)</label>
-                            <input type="password" id="pwNew" autocomplete="new-password" minlength="4">
+                            <input type="password" id="pwNew" autocomplete="new-password" minlength="4" class="form-input">
                         </div>
                         <div class="form-group btn-end-group">
                             <button class="btn" onclick="changePassword()" type="button">Alterar</button>
@@ -298,7 +300,9 @@
         </p>
     </footer>
 
-    <!-- Modais do Sistema -->
+    <!-- ===================== MODAIS ===================== -->
+
+    <!-- Auth -->
     <div id="authModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle" aria-hidden="true">
         <div class="modal-content small">
             <button class="close-modal" onclick="closeModal('authModal')" aria-label="Fechar modal" type="button">×</button>
@@ -322,7 +326,7 @@
                 <button type="submit" class="btn mt-1 w-100" id="btnLoginSubmit">Entrar</button>
                 <p class="text-muted fs-xs mt-2 text-center">Demo: maria@example.com / 123</p>
             </form>
-            <form id="formReg" class="hidden" onsubmit="doRegister(event)" role="tabpanel" aria-labelledby="tabReg" hidden novalidate>
+            <form id="formReg" class="hidden" onsubmit="doRegister(event)" role="tabpanel" aria-labelledby="tabReg" novalidate>
                 <div id="regAlert" class="alert" role="alert"></div>
                 <div class="form-group">
                     <label for="rgName">Nome</label>
@@ -341,6 +345,7 @@
         </div>
     </div>
 
+    <!-- Publicar item -->
     <div id="itemModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="itmHeading" aria-hidden="true">
         <div class="modal-content">
             <button class="close-modal" onclick="closeModal('itemModal')" aria-label="Fechar modal" type="button">×</button>
@@ -409,10 +414,14 @@
         </div>
     </div>
 
+    <!-- Detalhe do item – estrutura pronta para 2 colunas -->
     <div id="detailModal" class="modal" role="dialog" aria-modal="true" aria-label="Detalhes do item" aria-hidden="true">
-        <div class="modal-content" id="detailContent"></div>
+        <div class="modal-content modal-detail" id="detailContent">
+            <!-- Conteúdo injetado pelo JS. Use a estrutura recomendada abaixo no items.js -->
+        </div>
     </div>
 
+    <!-- Notificações -->
     <div id="notifModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="notifTitle" aria-hidden="true">
         <div class="modal-content small">
             <button class="close-modal" onclick="closeModal('notifModal')" aria-label="Fechar modal" type="button">×</button>
@@ -422,6 +431,7 @@
         </div>
     </div>
 
+    <!-- Avaliação -->
     <div id="ratingModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="ratingTitle" aria-hidden="true">
         <div class="modal-content small">
             <button class="close-modal" onclick="closeModal('ratingModal')" aria-label="Fechar modal" type="button">×</button>
@@ -439,6 +449,7 @@
         </div>
     </div>
 
+    <!-- Confirmação -->
     <div id="confirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="cfTitle" aria-hidden="true">
         <div class="modal-content small">
             <h2 id="cfTitle" class="mb-2">Confirmar Ação</h2>
@@ -450,6 +461,7 @@
         </div>
     </div>
 
+    <!-- Chat -->
     <div id="chatModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="chatTitle" aria-hidden="true">
         <div class="modal-content small">
             <button class="close-modal" onclick="closeModal('chatModal')" aria-label="Fechar modal" type="button">×</button>
@@ -463,6 +475,7 @@
         </div>
     </div>
 
+    <!-- Denúncia -->
     <div id="denounceModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="denounceTitle" aria-hidden="true">
         <div class="modal-content small">
             <button class="close-modal" onclick="closeModal('denounceModal')" aria-label="Fechar modal" type="button">×</button>
@@ -490,7 +503,7 @@
 
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
-        <!-- Modal de Seleção de Localização no Mapa -->
+    <!-- Mapa picker -->
     <div id="mapPickerModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="mapPickerTitle" aria-hidden="true">
         <div class="modal-content">
             <button class="close-modal" onclick="closeModal('mapPickerModal')" aria-label="Fechar modal" type="button">×</button>
@@ -504,7 +517,7 @@
         </div>
     </div>
 
-    <!-- Scripts do Sistema -->
+    <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
     <script src="js/utils.js" defer></script>
     <script src="js/data.js" defer></script>
@@ -517,7 +530,6 @@
     <script src="js/ui.js" defer></script>
     <script src="js/app.js" defer></script>
 
-    <!-- Registro do Service Worker -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {

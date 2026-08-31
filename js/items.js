@@ -15,10 +15,9 @@ let visibleCount = 12;
 let viewMode = 'grid';
 let editingItemId = null;
 let mapInstance = null;
-let denounceItemId = null; // ID do item sendo denunciado
-let searchLocation = null; // { lat, lng, name } ou null para usar localização padrão
+let denounceItemId = null;
+let searchLocation = null;
 
-// Variáveis para o mapa de seleção de local
 let mapPickerInstance = null;
 let mapPickerMarker = null;
 let mapPickerMarkerLayer = null;
@@ -33,9 +32,6 @@ const CAT_ICONS = {
     'Outros': '📦'
 };
 
-/**
- * Preenche o select de categorias no formulário de item.
- */
 function populateFormSelects() {
     const sel = document.getElementById('fCat');
     if (!sel) return;
@@ -44,11 +40,6 @@ function populateFormSelects() {
     ).join('');
 }
 
-/**
- * Atualiza um filtro específico e re-renderiza a grade.
- * @param {string} key - Nome do filtro
- * @param {string|number} value - Valor do filtro
- */
 function setFilter(key, value) {
     switch (key) {
         case 'minPrice':
@@ -65,28 +56,17 @@ function setFilter(key, value) {
     }
     visibleCount = 12;
     renderGrid();
-    if (key === 'category') renderChips(); // Atualiza chips quando categoria muda
+    if (key === 'category') renderChips();
 }
 
-/**
- * Atalho para definir ordenação.
- * @param {string} value - Valor da ordenação
- */
 function setSort(value) {
     setFilter('sort', value);
 }
 
-/**
- * Atalho para definir raio de distância.
- * @param {string} value - Raio em km
- */
 function setRadius(value) {
     setFilter('radius', value);
 }
 
-/**
- * Executa a busca com base no campo de busca.
- */
 function handleSearch() {
     const input = document.getElementById('searchInput');
     if (!input) return;
@@ -96,19 +76,11 @@ function handleSearch() {
 }
 
 let searchTimer;
-/**
- * Busca com debounce (300ms).
- */
 function debouncedSearch() {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(handleSearch, 300);
 }
 
-/**
- * Calcula a média de avaliações de um usuário.
- * @param {number} ownerId - ID do usuário
- * @returns {{avg: number, count: number}} Média e contagem
- */
 function ownerRating(ownerId) {
     const u = getUser(ownerId);
     if (!u || !u.ratings || u.ratings.length === 0) return { avg: 0, count: 0 };
@@ -116,30 +88,16 @@ function ownerRating(ownerId) {
     return { avg: sum / u.ratings.length, count: u.ratings.length };
 }
 
-/**
- * Obtém a localização de referência para filtro de distância.
- * Prioridade: local de busca definido > localização do usuário > São Paulo.
- * @returns {{lat: number, lng: number}}
- */
 function getUserLocationFilter() {
-    // 1. Se houver local de busca definido pelo usuário, usa ele
     if (searchLocation && typeof searchLocation.lat === 'number' && typeof searchLocation.lng === 'number') {
         return { lat: searchLocation.lat, lng: searchLocation.lng };
     }
-    // 2. Caso contrário, usa a localização do usuário logado (se tiver)
     if (currentUser && typeof currentUser.lat === 'number' && typeof currentUser.lng === 'number') {
         return { lat: currentUser.lat, lng: currentUser.lng };
     }
-    // 3. Fallback: São Paulo
     return { lat: -23.5505, lng: -46.6333 };
 }
 
-/**
- * Define a localização de busca manualmente.
- * @param {number} lat - Latitude
- * @param {number} lng - Longitude
- * @param {string} name - Nome descritivo (ex: "São Paulo, SP")
- */
 function setSearchLocation(lat, lng, name) {
     searchLocation = { lat, lng, name };
     const display = document.getElementById('selectedLocationDisplay');
@@ -150,9 +108,6 @@ function setSearchLocation(lat, lng, name) {
     renderGrid();
 }
 
-/**
- * Limpa a localização de busca, voltando ao padrão (usuário ou SP).
- */
 function clearSearchLocation() {
     searchLocation = null;
     const display = document.getElementById('selectedLocationDisplay');
@@ -163,9 +118,6 @@ function clearSearchLocation() {
     renderGrid();
 }
 
-/**
- * Busca endereço digitado e define como local de busca.
- */
 async function searchLocationByAddress() {
     const input = document.getElementById('searchLocationInput');
     if (!input) return;
@@ -188,9 +140,6 @@ async function searchLocationByAddress() {
     }
 }
 
-/**
- * Usa a localização do navegador como centro da busca.
- */
 function useMyLocation() {
     getUserLocation()
         .then(pos => {
@@ -201,9 +150,6 @@ function useMyLocation() {
         .catch(err => showToast('Erro ao obter localização: ' + err, 'error'));
 }
 
-/**
- * Abre o modal de mapa para selecionar local.
- */
 function openMapPicker() {
     openModal('mapPickerModal');
     if (!mapPickerInstance) {
@@ -229,9 +175,6 @@ function openMapPicker() {
     }
 }
 
-/**
- * Confirma a localização selecionada no mapa.
- */
 function confirmMapLocation() {
     if (!mapPickerMarker) {
         showToast('Clique no mapa para selecionar um ponto.', 'warning');
@@ -248,15 +191,10 @@ function confirmMapLocation() {
         });
 }
 
-/**
- * Retorna a lista de itens filtrados e ordenados.
- * @returns {Array} Lista de itens
- */
 function filteredItems() {
     const q = norm(filters.q);
     let list = DB.items.filter(i => i.status === 'available');
 
-    // Filtro por texto
     if (q) {
         list = list.filter(i =>
             norm(i.title).includes(q) ||
@@ -265,24 +203,20 @@ function filteredItems() {
         );
     }
 
-    // Filtro por categoria
     if (filters.category !== 'all') {
         list = list.filter(i => i.category === filters.category);
     }
 
-    // Filtro por tipo
     if (filters.type !== 'all') {
         list = list.filter(i =>
             filters.type === 'sale' ? i.price > 0 : i.acceptTrades
         );
     }
 
-    // Filtro por condição
     if (filters.condition !== 'all') {
         list = list.filter(i => i.condition === filters.condition);
     }
 
-    // Filtro por preço
     if (filters.minPrice > 0) {
         list = list.filter(i => i.price >= filters.minPrice);
     }
@@ -290,7 +224,6 @@ function filteredItems() {
         list = list.filter(i => i.price <= filters.maxPrice);
     }
 
-    // Filtro por distância (usa a localização de referência)
     if (filters.radius > 0) {
         const center = getUserLocationFilter();
         list = list.filter(i => {
@@ -300,7 +233,6 @@ function filteredItems() {
         });
     }
 
-    // Ordenação
     const sorters = {
         recent: (a, b) => b.createdAt - a.createdAt,
         price_asc: (a, b) => (a.price || 0) - (b.price || 0),
@@ -317,9 +249,6 @@ function filteredItems() {
     return list.sort(sorters[filters.sort] || sorters.recent);
 }
 
-/**
- * Renderiza os chips de categoria.
- */
 function renderChips() {
     const container = document.getElementById('catChips');
     if (!container) return;
@@ -333,10 +262,6 @@ function renderChips() {
     ).join('');
 }
 
-/**
- * Define a categoria selecionada e re-renderiza.
- * @param {string} c - Categoria
- */
 function setCategory(c) {
     filters.category = c;
     visibleCount = 12;
@@ -345,11 +270,9 @@ function setCategory(c) {
 }
 
 /**
- * Gera o HTML de um card de item.
- * @param {Object} i - Item
- * @returns {string} HTML do card
+ * Card estilo Mercado Livre + botões de ação no hover
  */
-function itemCard(i) {
+function itemCard(i, index) {
     const owner = getUser(i.ownerId);
     const r = ownerRating(i.ownerId);
     const img = safeImageUrl(i.image);
@@ -357,45 +280,80 @@ function itemCard(i) {
         ? `<img class="item-image" src="${img}" alt="${esc(i.title)}" loading="lazy">`
         : `<div class="image-placeholder">${CAT_ICONS[i.category] || '📦'}</div>`;
 
-    const typeTags = (i.price > 0 && i.type !== 'trade' ? '<span class="mini-tag sale">Venda</span>' : '') +
-                     (i.acceptTrades ? '<span class="mini-tag trade">Troca</span>' : '');
+    // Preço
+    let priceDisplay;
+    if (i.price > 0 && i.type !== 'trade') {
+        priceDisplay = `<span class="coin-icon">🪙</span> ${fmt(i.price)}`;
+    } else {
+        priceDisplay = '<span class="trade-badge">🔄 Troca</span>';
+    }
 
+    // Tags de tipo
+    const typeTags =
+        (i.price > 0 && i.type !== 'trade' ? '<span class="mini-tag sale">Venda</span>' : '') +
+        (i.acceptTrades ? '<span class="mini-tag trade">Troca</span>' : '');
+
+    // Distância / localização
     let distHtml = '';
     if (i.lat && i.lng) {
         const center = getUserLocationFilter();
         const dist = distance(center.lat, center.lng, i.lat, i.lng);
         if (dist !== null && !isNaN(dist)) {
-            distHtml = `<span>· ${dist.toFixed(1)} km</span>`;
+            distHtml = `<span>📍 ${dist.toFixed(1)} km</span>`;
         }
         if (i.location) {
-            distHtml += `<span>· 📍 ${esc(i.location)}</span>`;
+            distHtml += `<span class="location-name">${esc(i.location)}</span>`;
         }
     }
 
+    // Favorito
     const isFav = currentUser?.favs?.includes(i.id) || false;
     const favBtn = currentUser
-        ? `<button class="fav-btn" onclick="event.stopPropagation(); toggleFav(${i.id})" 
+        ? `<button class="fav-btn ${isFav ? 'active' : ''}" 
+                   onclick="event.stopPropagation(); toggleFav(${i.id})"
                    aria-label="${isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}">
-            ${isFav ? '❤️' : '🤍'}
+            <span class="heart">${isFav ? '❤️' : '🤍'}</span>
         </button>`
         : '';
 
-    const statusFlag = i.status !== 'available' ? '<span class="status-flag">Indisponível</span>' : '';
+    // Botões de ação no hover
+    let actionButtons = '';
+    if (currentUser && i.ownerId !== currentUser.id && i.status === 'available') {
+        actionButtons = `
+            <button class="btn-action primary" onclick="event.stopPropagation(); openDetail(${i.id})">Ver detalhes</button>
+            ${i.acceptTrades ? `<button class="btn-action secondary" onclick="event.stopPropagation(); submitTradeProposal(${i.id})">Trocar</button>` : ''}
+        `;
+    } else {
+        actionButtons = `
+            <button class="btn-action primary" onclick="event.stopPropagation(); openDetail(${i.id})">Ver detalhes</button>
+        `;
+    }
+
+    const statusFlag = i.status !== 'available'
+        ? '<span class="status-flag">Indisponível</span>'
+        : '';
+
+    const delay = (index % 12) * 0.04;
 
     return `
-    <article class="card-item" onclick="openDetail(${i.id})" tabindex="0" role="button" aria-label="Ver detalhes de ${esc(i.title)}">
+    <article class="card-item" data-item-id="${i.id}" onclick="openDetail(${i.id})" 
+             style="animation-delay: ${delay}s" tabindex="0" role="button" 
+             aria-label="Ver detalhes de ${esc(i.title)}">
         <div class="card-media">
             ${media}
             ${favBtn}
             ${statusFlag}
+            <div class="card-actions">
+                ${actionButtons}
+            </div>
         </div>
         <div class="info">
-            <div class="price">${i.price > 0 ? `R$ ${fmt(i.price)}` : 'Troca'}</div>
+            ${typeTags}
+            <div class="price">${priceDisplay}</div>
             <h3 class="title">${esc(i.title)}</h3>
-            <div class="tag-row">${typeTags}<span class="mini-tag">${CONDITIONS[i.condition] || i.condition}</span></div>
             <div class="meta">
-                <span>${owner ? esc(owner.name.split(' ')[0]) : ''} ${r.count ? `⭐ ${fmtAvg(r.avg)}` : ''}</span>
-                <span>👁 ${fmt(i.views || 0)}</span>
+                <span class="owner">${owner ? esc(owner.name.split(' ')[0]) : ''}${r.count ? ` · ⭐ ${fmtAvg(r.avg)}` : ''}</span>
+                <span class="views">👁 ${fmt(i.views || 0)}</span>
                 ${distHtml}
             </div>
         </div>
@@ -403,13 +361,12 @@ function itemCard(i) {
 }
 
 /**
- * Renderiza a grade de itens de acordo com filtros e modo de visualização.
+ * Renderiza a grade de itens
  */
 function renderGrid() {
     const grid = document.getElementById('itemsGrid');
     if (!grid) return;
 
-    // Preserva a classe base 'grid' e alterna entre 'grid' e 'list-view'
     grid.classList.remove('list-view');
     if (viewMode === 'list') {
         grid.classList.add('list-view');
@@ -418,7 +375,7 @@ function renderGrid() {
     const all = filteredItems();
     const shown = all.slice(0, visibleCount);
     grid.innerHTML = shown.length
-        ? shown.map(itemCard).join('')
+        ? shown.map((item, idx) => itemCard(item, idx)).join('')
         : '<div class="empty-state">Nenhum item encontrado.</div>';
 
     const resultsInfo = document.getElementById('resultsInfo');
@@ -427,20 +384,13 @@ function renderGrid() {
     }
 }
 
-/**
- * Carrega mais itens (scroll infinito).
- */
 function loadMore() {
     const all = filteredItems();
-    if (visibleCount >= all.length) return; // Não carrega se já mostrou tudo
+    if (visibleCount >= all.length) return;
     visibleCount += 12;
     renderGrid();
 }
 
-/**
- * Altera o modo de visualização (grade ou lista).
- * @param {string} mode - 'grid' ou 'list'
- */
 function setViewMode(mode) {
     viewMode = mode;
     const btnGrid = document.getElementById('btnGridView');
@@ -453,8 +403,7 @@ function setViewMode(mode) {
 }
 
 /**
- * Alterna o status de favorito de um item para o usuário logado.
- * @param {number} itemId - ID do item
+ * Alterna favorito
  */
 function toggleFav(itemId) {
     if (!currentUser) {
@@ -476,9 +425,6 @@ function toggleFav(itemId) {
     }
 }
 
-/**
- * Abre o modal de publicação/edição de item.
- */
 function openSellModal() {
     if (!currentUser) {
         openAuth('login');
@@ -500,7 +446,6 @@ function openSellModal() {
     onTypeChange();
     openModal('itemModal');
 
-    // Inicializa mapa Leaflet se ainda não existir
     if (!mapInstance) {
         try {
             const center = getUserLocationFilter();
@@ -519,10 +464,6 @@ function openSellModal() {
     }
 }
 
-/**
- * Preenche o formulário para editar um item existente.
- * @param {number} id - ID do item
- */
 function editItem(id) {
     const i = getItem(id);
     if (!i || i.ownerId !== currentUser?.id) return;
@@ -547,9 +488,6 @@ function editItem(id) {
     }
 }
 
-/**
- * Mostra/oculta o campo de preço conforme o tipo de negociação.
- */
 function onTypeChange() {
     const type = document.getElementById('fType').value;
     const priceGroup = document.getElementById('priceGroup');
@@ -558,14 +496,9 @@ function onTypeChange() {
     }
 }
 
-/**
- * Lida com upload de imagem, convertendo para Data URL.
- * @param {HTMLInputElement} input - Input de arquivo
- */
 function handleImageUpload(input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
-        // Valida tipo e tamanho (máx. 2MB)
         if (!file.type.startsWith('image/')) {
             showToast('Formato de imagem inválido.', 'error');
             input.value = '';
@@ -590,9 +523,6 @@ function handleImageUpload(input) {
     }
 }
 
-/**
- * Obtém a localização do navegador e preenche os campos.
- */
 function getLocationFromBrowser() {
     getUserLocation()
         .then(pos => {
@@ -607,10 +537,6 @@ function getLocationFromBrowser() {
         .catch(err => showToast('Erro ao obter localização: ' + err.message, 'error'));
 }
 
-/**
- * Salva um item (criação ou edição).
- * @param {Event} ev - Evento de submit
- */
 function saveItem(ev) {
     ev.preventDefault();
     if (!currentUser) return;
@@ -697,8 +623,7 @@ function saveItem(ev) {
 }
 
 /**
- * Abre o modal de detalhes do item.
- * @param {number} itemId - ID do item
+ * Modal de detalhe – layout em duas colunas (estilo ML)
  */
 function openDetail(itemId) {
     const item = getItem(itemId);
@@ -708,8 +633,9 @@ function openDetail(itemId) {
     const img = safeImageUrl(item.image);
     const media = img
         ? `<img src="${img}" alt="${esc(item.title)}" class="detail-image">`
-        : `<div class="image-placeholder">${CAT_ICONS[item.category] || '📦'}</div>`;
+        : `<div class="image-placeholder" style="font-size:4rem;height:280px;display:flex;align-items:center;justify-content:center;">${CAT_ICONS[item.category] || '📦'}</div>`;
 
+    // Distância / localização
     let distText = 'Localização não informada';
     if (item.lat && item.lng) {
         const center = getUserLocationFilter();
@@ -718,24 +644,35 @@ function openDetail(itemId) {
             distText = `${dist.toFixed(1)} km`;
         }
         if (item.location) {
-            distText += ` (${esc(item.location)})`;
+            distText += ` · ${esc(item.location)}`;
         }
     }
 
+    // Tags
+    const typeTags =
+        (item.price > 0 && item.type !== 'trade' ? '<span class="mini-tag sale">Venda</span> ' : '') +
+        (item.acceptTrades ? '<span class="mini-tag trade">Troca</span>' : '');
+
+    // Preço destacado
+    const priceHtml = item.price > 0 && item.type !== 'trade'
+        ? `<div class="detail-price">🪙 ${fmt(item.price)}</div>`
+        : `<div class="detail-price"><span class="trade-badge">🔄 Somente troca</span></div>`;
+
+    // Botões de ação
     let actionButtons = '';
     if (currentUser && item.ownerId !== currentUser.id && item.status === 'available') {
         if (item.price > 0 && item.type !== 'trade') {
-            actionButtons += `<button class="btn btn-warning" onclick="buyWithCoins(${item.id})">Comprar por R$ ${fmt(item.price)}</button>`;
+            actionButtons += `<button class="btn btn-warning" onclick="buyWithCoins(${item.id})">🛒 Comprar por ${fmt(item.price)}</button>`;
         }
         if (item.acceptTrades) {
-            actionButtons += `<button class="btn btn-secondary" onclick="submitTradeProposal(${item.id})">Propor troca</button>`;
+            actionButtons += `<button class="btn btn-secondary" onclick="submitTradeProposal(${item.id})">🔄 Propor troca</button>`;
         }
-        actionButtons += `<button class="btn btn-secondary" onclick="openChat(${item.ownerId})">💬 Conversar</button>`;
+        actionButtons += `<button class="btn" onclick="openChat(${item.ownerId})">💬 Conversar</button>`;
         actionButtons += `<button class="btn btn-danger" onclick="openDenounce(${item.id})">Denunciar</button>`;
     } else if (!currentUser) {
         actionButtons = `<button class="btn" onclick="openAuth('login')">Entre para negociar</button>`;
     } else if (item.ownerId === currentUser.id) {
-        actionButtons = `<button class="btn btn-secondary" onclick="editItem(${item.id})">Editar</button>`;
+        actionButtons = `<button class="btn btn-secondary" onclick="editItem(${item.id})">✏️ Editar</button>`;
         if (item.status === 'available') {
             actionButtons += `<button class="btn btn-danger" onclick="askConfirm('Excluir item', 'Deseja excluir este anúncio?', () => deleteItem(${item.id}))">Excluir</button>`;
         }
@@ -743,26 +680,38 @@ function openDetail(itemId) {
 
     const detailContent = document.getElementById('detailContent');
     if (!detailContent) return;
+
     detailContent.innerHTML = `
-        <button class="close-modal" onclick="closeModal('detailModal')" aria-label="Fechar detalhes">×</button>
-        <div class="detail-media">${media}</div>
-        <h2 class="detail-title">${esc(item.title)}</h2>
-        <div class="detail-meta">
-            <span>${item.price > 0 ? 'R$ ' + fmt(item.price) : 'Troca'}</span>
-            <span>${CONDITIONS[item.condition] || item.condition}</span>
-            <span>${CAT_ICONS[item.category] || '📦'} ${esc(item.category)}</span>
-            <span>👁 ${fmt(item.views || 0)}</span>
-            <span>📍 ${distText}</span>
-        </div>
-        <p class="detail-desc">${esc(item.desc) || 'Sem descrição.'}</p>
-        <div class="detail-owner">
-            <div class="user-avatar">${owner ? esc(owner.name.charAt(0)) : '?'}</div>
-            <div>
-                <strong>${owner ? esc(owner.name) : 'Usuário'}</strong>
-                ${r.count ? `<span>⭐ ${fmtAvg(r.avg)} (${r.count})</span>` : '<span>Sem avaliações</span>'}
+        <button class="close-modal" onclick="closeModal('detailModal')" aria-label="Fechar detalhes" type="button">×</button>
+        <div class="modal-detail-body">
+            <div class="modal-detail-left">
+                <div class="detail-media">${media}</div>
+            </div>
+            <div class="modal-detail-right">
+                <div>${typeTags}</div>
+                <h2 class="detail-title">${esc(item.title)}</h2>
+                ${priceHtml}
+                <div class="detail-meta">
+                    <span>${CONDITIONS[item.condition] || item.condition}</span>
+                    <span>${CAT_ICONS[item.category] || '📦'} ${esc(item.category)}</span>
+                    <span>👁 ${fmt(item.views || 0)} visualizações</span>
+                    <span>📍 ${distText}</span>
+                </div>
+                <p class="detail-desc" style="color:var(--text-light);font-size:0.95rem;line-height:1.55;margin-bottom:0.75rem;">
+                    ${esc(item.desc) || 'Sem descrição.'}
+                </p>
+                <div class="detail-owner">
+                    <div class="user-avatar">${owner ? esc(owner.name.charAt(0).toUpperCase()) : '?'}</div>
+                    <div>
+                        <div class="fw-bold">${owner ? esc(owner.name) : 'Usuário'}</div>
+                        <div class="fs-sm text-muted">
+                            ${r.count ? `⭐ ${fmtAvg(r.avg)} · ${r.count} avaliações` : 'Sem avaliações'}
+                        </div>
+                    </div>
+                </div>
+                <div class="detail-actions">${actionButtons}</div>
             </div>
         </div>
-        <div class="detail-actions">${actionButtons}</div>
     `;
 
     item.views = (item.views || 0) + 1;
@@ -770,10 +719,6 @@ function openDetail(itemId) {
     openModal('detailModal');
 }
 
-/**
- * Exclui um item do usuário logado.
- * @param {number} itemId - ID do item
- */
 function deleteItem(itemId) {
     const item = getItem(itemId);
     if (!item || item.ownerId !== currentUser?.id) return;
@@ -788,10 +733,6 @@ function deleteItem(itemId) {
     showToast('Anúncio excluído.', 'warning');
 }
 
-/**
- * Abre o modal de denúncia para um item.
- * @param {number} itemId - ID do item
- */
 function openDenounce(itemId) {
     const item = getItem(itemId);
     if (!item) return;
@@ -805,15 +746,11 @@ function openDenounce(itemId) {
     openModal('denounceModal');
 }
 
-/**
- * Envia a denúncia do item.
- */
 function submitDenounce() {
     if (!denounceItemId || !currentUser) return;
     const item = getItem(denounceItemId);
     if (!item) return;
 
-    // Verifica se o usuário já denunciou este item
     const alreadyDenounced = DB.denounces.some(d =>
         d.itemId === denounceItemId && d.reporterId === currentUser.id
     );

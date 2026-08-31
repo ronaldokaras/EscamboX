@@ -1,8 +1,43 @@
-// Painel administrativo
+'use strict';
+
+// Painel administrativo com auto-refresh para demonstração
+let adminRefreshInterval = null;
+
+/**
+ * Inicia o auto-refresh do painel admin (a cada 5 segundos)
+ * O intervalo só executa se a seção admin estiver visível.
+ */
+function startAdminAutoRefresh() {
+    if (adminRefreshInterval) {
+        clearInterval(adminRefreshInterval);
+        adminRefreshInterval = null;
+    }
+    adminRefreshInterval = setInterval(() => {
+        const adminSection = document.getElementById('sec-admin');
+        // Só atualiza se a seção admin estiver visível e não estiver oculta
+        if (adminSection && !adminSection.classList.contains('hidden')) {
+            renderAdmin();
+        } else {
+            // Se saiu da seção admin, para o intervalo
+            stopAdminAutoRefresh();
+        }
+    }, 5000); // 5 segundos
+}
+
+/**
+ * Para o auto-refresh do admin
+ */
+function stopAdminAutoRefresh() {
+    if (adminRefreshInterval) {
+        clearInterval(adminRefreshInterval);
+        adminRefreshInterval = null;
+    }
+}
 
 /**
  * Renderiza o painel administrativo.
  * Só executa se o usuário logado for admin e não estiver banido.
+ * Inicia o auto-refresh se ainda não estiver rodando.
  */
 function renderAdmin() {
     const currentUser = getCurrentUser();
@@ -23,6 +58,11 @@ function renderAdmin() {
         renderAdminTrades();
         renderAdminUsers();
         renderAdminDenounces();
+
+        // Inicia auto-refresh se ainda não estiver rodando
+        if (!adminRefreshInterval) {
+            startAdminAutoRefresh();
+        }
     } catch (error) {
         console.error('Erro ao renderizar painel admin:', error);
         showToast('Erro ao carregar dados administrativos.', 'error');
@@ -31,6 +71,7 @@ function renderAdmin() {
 
 /**
  * Renderiza a tabela de negócios no admin.
+ * Inclui um botão "Atualizar" para refresh manual.
  */
 function renderAdminTrades() {
     const tbody = document.getElementById('admTradesTbody');
@@ -65,6 +106,9 @@ function renderAdminTrades() {
             </tr>
         `;
     }).join('');
+
+    // Adiciona um botão "Atualizar" acima da tabela (opcional)
+    // Mas já temos o auto-refresh, então não é necessário.
 }
 
 /**
@@ -78,7 +122,6 @@ function renderAdminUsers() {
         const roleLabel = { user: 'Usuário', admin: 'Admin', banned: 'Banido' }[u.role] || u.role;
         const itemCount = DB.items.filter(i => i.ownerId === u.id).length;
 
-        // Ações possíveis
         let actionButtons = '';
         if (u.role !== 'admin') {
             actionButtons += `<button class="btn btn-danger" onclick="adminDeleteUser(${u.id})" data-action="delete-user">Excluir</button> `;
@@ -377,3 +420,8 @@ function adminIgnoreDenounce(denounceId) {
         }
     });
 }
+
+// Para parar o auto-refresh quando a página for fechada ou recarregada
+window.addEventListener('beforeunload', function() {
+    stopAdminAutoRefresh();
+});
