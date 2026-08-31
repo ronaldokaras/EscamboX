@@ -108,8 +108,8 @@
                     <label for="selType" class="visually-hidden">Tipo de anúncio</label>
                     <select id="selType" class="filter-select" onchange="setFilter('type', this.value)">
                         <option value="all">Tipo: todos</option>
-                        <option value="sale">Venda</option>
-                        <option value="trade">Troca</option>
+                        <option value="sale">Por moedas</option>
+                        <option value="trade">Troca de item</option>
                     </select>
                     <label for="selCondition" class="visually-hidden">Condição</label>
                     <select id="selCondition" class="filter-select" onchange="setFilter('condition', this.value)">
@@ -340,6 +340,16 @@
                     <label for="rgPass">Senha (mín. 4)</label>
                     <input type="password" id="rgPass" minlength="4" required class="form-input" autocomplete="new-password">
                 </div>
+                <div class="form-group">
+                    <label for="rgLocation">Onde você mora? (cidade / bairro)</label>
+                    <div class="location-row">
+                        <input type="text" id="rgLocation" placeholder="Ex: São Paulo, SP" required class="form-input flex-1" autocomplete="address-level2">
+                        <button type="button" class="btn btn-secondary" onclick="getRegLocationFromGPS()" title="Usar GPS">📍 GPS</button>
+                    </div>
+                    <input type="hidden" id="rgLat">
+                    <input type="hidden" id="rgLng">
+                    <p class="text-muted fs-xs mt-1">Usado para mostrar itens próximos a você.</p>
+                </div>
                 <button type="submit" class="btn mt-1 w-100" id="btnRegSubmit">Criar conta e ganhar 20 moedas</button>
             </form>
         </div>
@@ -377,14 +387,15 @@
                 <div class="form-group">
                     <label for="fType">Tipo de negociação</label>
                     <select id="fType" onchange="onTypeChange()" class="form-input">
-                        <option value="both">Venda ou troca</option>
-                        <option value="sale">Somente venda</option>
-                        <option value="trade">Somente troca</option>
+                        <option value="both">Moedas ou troca de item</option>
+                        <option value="sale">Somente por moedas</option>
+                        <option value="trade">Somente troca de item</option>
                     </select>
                 </div>
                 <div class="form-group" id="priceGroup">
                     <label for="fPrice">Preço em moedas *</label>
                     <input type="number" id="fPrice" min="0" step="1" value="50" class="form-input">
+                    <p class="text-muted fs-xs mt-1">Não usa dinheiro real — apenas moedas virtuais da plataforma.</p>
                 </div>
                 <div class="form-group">
                     <label for="fImg">URL da imagem</label>
@@ -502,6 +513,39 @@
     </div>
 
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Modal: Propor troca de item -->
+    <div id="tradeProposalModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="tradeProposalTitle" aria-hidden="true">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal('tradeProposalModal')" aria-label="Fechar modal" type="button">×</button>
+            <h2 id="tradeProposalTitle" class="mb-2">Propor troca de item</h2>
+            <p id="tradeTargetInfo" class="text-muted mb-3">Você está propondo troca pelo item: <strong>—</strong></p>
+            
+            <div class="form-group">
+                <label for="tradeOfferItem">Escolha um dos seus itens disponíveis para oferecer</label>
+                <select id="tradeOfferItem" class="form-input">
+                    <option value="">— Selecione um item seu —</option>
+                </select>
+                <p class="text-muted fs-xs mt-1">Só aparecem anúncios seus com status disponível.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="tradeOfferCoins">Adicionar moedas à oferta? (opcional)</label>
+                <input type="number" id="tradeOfferCoins" class="form-input" min="0" step="1" value="0" placeholder="0">
+                <p class="text-muted fs-xs mt-1">Você pode oferecer só o item, só moedas ou os dois juntos.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="tradeOfferMsg">Mensagem (opcional)</label>
+                <textarea id="tradeOfferMsg" class="form-input textarea-fixed" maxlength="200" placeholder="Ex: Me interesso pelo seu item, topa trocar?"></textarea>
+            </div>
+
+            <div class="modal-actions mt-3">
+                <button class="btn btn-secondary" onclick="closeModal('tradeProposalModal')" type="button">Cancelar</button>
+                <button class="btn" onclick="submitTradeProposal()" type="button">Enviar oferta</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Mapa picker -->
     <div id="mapPickerModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="mapPickerTitle" aria-hidden="true">

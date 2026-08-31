@@ -1,13 +1,13 @@
 'use strict';
 
-// Negociações, compra e troca
+// Negociações, compra e troca (escambo com moedas virtuais)
 let ratingTradeId = null;
 let ratingTargetUserId = null;
 let ratingStars = 0;
+let tradeTargetItemId = null; // item que o usuário quer receber
 
 /**
- * Envia proposta de compra de um item com moedas.
- * @param {number} itemId - ID do item
+ * Compra com moedas virtuais (proposta)
  */
 function buyWithCoins(itemId) {
     if (!currentUser) {
@@ -17,55 +17,60 @@ function buyWithCoins(itemId) {
 
     const item = getItem(itemId);
     if (!item || item.status !== 'available' || item.ownerId === currentUser.id) {
-        showToast('Item não disponível para compra.', 'error');
+        showToast('Item não disponível para aquisição.', 'error');
         return;
     }
     if (item.price <= 0 || item.type === 'trade') {
-        showToast('Item somente para troca.', 'warning');
+        showToast('Este item é somente para troca de item.', 'warning');
         return;
     }
     if (currentUser.coins < item.price) {
-        showToast('Saldo insuficiente.', 'error');
+        showToast('Saldo insuficiente de moedas.', 'error');
         return;
     }
 
-    askConfirm('Propor compra', `Enviar proposta de compra de ${fmt(item.price)} moedas por "${item.title}"?`, () => {
-        try {
-            item.status = 'reserved';
-            const trade = {
-                id: nextId(),
-                type: 'purchase',
-                proposerId: currentUser.id,
-                receiverId: item.ownerId,
-                proposerItemId: null,
-                receiverItemId: item.id,
-                coins: item.price,
-                status: 'pending',
-                createdAt: Date.now(),
-                completedAt: null,
-                ratedByProposer: false,
-                ratedByReceiver: false,
-                snapshots: [{ itemId: item.id, ownerId: item.ownerId }],
-                coinMoves: []
-            };
-            DB.trades.push(trade);
-            notify(item.ownerId, `${currentUser.name} enviou proposta de compra para "${item.title}".`);
-            save();
-            closeModal('detailModal');
-            renderAll();
-            showToast('Proposta enviada.', 'info');
-        } catch (error) {
-            console.error('Erro ao propor compra:', error);
-            showToast('Erro ao enviar proposta.', 'error');
+    askConfirm(
+        'Propor aquisição',
+        `Enviar proposta de ${fmt(item.price)} moedas por "${item.title}"?`,
+        () => {
+            try {
+                item.status = 'reserved';
+                const trade = {
+                    id: nextId(),
+                    type: 'purchase',
+                    proposerId: currentUser.id,
+                    receiverId: item.ownerId,
+                    proposerItemId: null,
+                    receiverItemId: item.id,
+                    coins: item.price,
+                    message: '',
+                    status: 'pending',
+                    createdAt: Date.now(),
+                    completedAt: null,
+                    ratedByProposer: false,
+                    ratedByReceiver: false,
+                    snapshots: [{ itemId: item.id, ownerId: item.ownerId }],
+                    coinMoves: []
+                };
+                DB.trades.push(trade);
+                notify(item.ownerId, `${currentUser.name} enviou proposta de ${fmt(item.price)} moedas por "${item.title}".`);
+                save();
+                closeModal('detailModal');
+                renderAll();
+                showToast('Proposta enviada.', 'info');
+            } catch (error) {
+                console.error('Erro ao propor compra:', error);
+                showToast('Erro ao enviar proposta.', 'error');
+            }
         }
-    });
+    );
 }
 
 /**
- * Envia proposta de troca de um item por outro.
- * @param {number} receiverItemId - ID do item desejado
+ * Abre o modal de proposta de troca (escolher item próprio + moedas opcionais)
+ * Chamado pelos cards e pelo detalhe do item.
  */
-function submitTradeProposal(receiverItemId) {
+function openTradeProposal(receiverItemId) {
     if (!currentUser) {
         openAuth('login');
         return;
@@ -76,68 +81,163 @@ function submitTradeProposal(receiverItemId) {
         showToast('Item não disponível para troca.', 'error');
         return;
     }
+    if (!targetItem.acceptTrades) {
+        showToast('Este item não aceita troca de item.', 'warning');
+        return;
+    }
+
+    tradeTargetItemId = receiverItemId;
+
+    const info = document.getElementById('tradeTargetInfo');
+    if (info) {
+        info.innerHTML = `Você está propondo troca pelo item: <strong>${esc(targetItem.title)}</strong>`;
+    }
 
     const myAvailable = DB.items.filter(i =>
         i.ownerId === currentUser.id &&
         i.status === 'available' &&
-        i.acceptTrades
+        i.id !== receiverItemId
     );
-    if (myAvailable.length === 0) {
-        showToast('Você não tem itens disponíveis para troca.', 'warning');
-        return;
-    }
 
-    // Monta lista numerada para o prompt
-    const options = myAvailable.map((i, idx) => `${idx + 1}. ${i.title}`).join('\n');
-    const choice = prompt(`Selecione o item que deseja oferecer em troca:\n${options}`, '1');
-    if (!choice) return;
-
-    const idx = parseInt(choice, 10) - 1;
-    if (isNaN(idx) || idx < 0 || idx >= myAvailable.length) {
-        showToast('Seleção inválida.', 'error');
-        return;
-    }
-
-    const myItem = myAvailable[idx];
-    askConfirm('Propor troca', `Deseja oferecer "${myItem.title}" em troca de "${targetItem.title}"?`, () => {
-        try {
-            const trade = {
-                id: nextId(),
-                type: 'trade',
-                proposerId: currentUser.id,
-                receiverId: targetItem.ownerId,
-                proposerItemId: myItem.id,
-                receiverItemId: targetItem.id,
-                coins: 0,
-                status: 'pending',
-                createdAt: Date.now(),
-                completedAt: null,
-                ratedByProposer: false,
-                ratedByReceiver: false,
-                snapshots: [
-                    { itemId: myItem.id, ownerId: currentUser.id },
-                    { itemId: targetItem.id, ownerId: targetItem.ownerId }
-                ],
-                coinMoves: []
-            };
-            DB.trades.push(trade);
-            myItem.status = 'reserved';
-            targetItem.status = 'reserved';
-            notify(targetItem.ownerId, `${currentUser.name} propôs troca: ${myItem.title} por ${targetItem.title}.`);
-            save();
-            closeModal('detailModal');
-            renderAll();
-            showToast('Proposta de troca enviada.', 'info');
-        } catch (error) {
-            console.error('Erro ao propor troca:', error);
-            showToast('Erro ao enviar proposta de troca.', 'error');
+    const select = document.getElementById('tradeOfferItem');
+    if (select) {
+        if (myAvailable.length === 0) {
+            select.innerHTML = '<option value="">Você não tem itens disponíveis para oferecer</option>';
+        } else {
+            select.innerHTML =
+                '<option value="">— Selecione um item seu (opcional se for só moedas) —</option>' +
+                myAvailable.map(i =>
+                    `<option value="${i.id}">${esc(i.title)}${i.price > 0 ? ` · 🪙 ${fmt(i.price)}` : ''}</option>`
+                ).join('');
         }
-    });
+    }
+
+    const coinsInput = document.getElementById('tradeOfferCoins');
+    if (coinsInput) coinsInput.value = 0;
+    const msgInput = document.getElementById('tradeOfferMsg');
+    if (msgInput) msgInput.value = '';
+
+    openModal('tradeProposalModal');
 }
 
 /**
- * Aceita uma negociação pendente (compra ou troca).
- * @param {number} tradeId - ID da negociação
+ * Envia a proposta de troca a partir do modal
+ * (item ofertado e/ou moedas + mensagem)
+ */
+function submitTradeProposal() {
+    if (!currentUser || !tradeTargetItemId) {
+        // fallback antigo: se chamado com ID direto (compatibilidade)
+        if (arguments.length === 1 && typeof arguments[0] === 'number') {
+            openTradeProposal(arguments[0]);
+            return;
+        }
+        showToast('Selecione o item desejado novamente.', 'warning');
+        return;
+    }
+
+    const targetItem = getItem(tradeTargetItemId);
+    if (!targetItem || targetItem.status !== 'available') {
+        showToast('Item alvo indisponível.', 'error');
+        closeModal('tradeProposalModal');
+        return;
+    }
+
+    const offerItemIdRaw = document.getElementById('tradeOfferItem')?.value;
+    const offerItemId = offerItemIdRaw ? parseInt(offerItemIdRaw, 10) : null;
+    const offerCoins = parseInt(document.getElementById('tradeOfferCoins')?.value, 10) || 0;
+    const message = (document.getElementById('tradeOfferMsg')?.value || '').trim();
+
+    if (!offerItemId && offerCoins <= 0) {
+        showToast('Escolha um item seu e/ou informe quantas moedas ofertar.', 'warning');
+        return;
+    }
+
+    let myItem = null;
+    if (offerItemId) {
+        myItem = getItem(offerItemId);
+        if (!myItem || myItem.ownerId !== currentUser.id || myItem.status !== 'available') {
+            showToast('Item ofertado inválido.', 'error');
+            return;
+        }
+    }
+
+    if (offerCoins > 0 && currentUser.coins < offerCoins) {
+        showToast(`Saldo insuficiente. Você tem ${fmt(currentUser.coins)} moedas.`, 'error');
+        return;
+    }
+
+    // Evita proposta duplicada pendente para o mesmo item
+    const already = DB.trades.some(t =>
+        t.status === 'pending' &&
+        t.proposerId === currentUser.id &&
+        t.receiverItemId === tradeTargetItemId
+    );
+    if (already) {
+        showToast('Você já tem uma proposta pendente para este item.', 'warning');
+        closeModal('tradeProposalModal');
+        return;
+    }
+
+    askConfirm(
+        'Confirmar oferta',
+        offerItemId
+            ? `Oferecer "${myItem.title}"${offerCoins > 0 ? ` + ${fmt(offerCoins)} moedas` : ''} por "${targetItem.title}"?`
+            : `Oferecer ${fmt(offerCoins)} moedas por "${targetItem.title}"?`,
+        () => {
+            try {
+                const trade = {
+                    id: nextId(),
+                    type: offerItemId ? 'trade' : 'purchase',
+                    proposerId: currentUser.id,
+                    receiverId: targetItem.ownerId,
+                    proposerItemId: offerItemId || null,
+                    receiverItemId: targetItem.id,
+                    coins: offerCoins,
+                    message: message,
+                    status: 'pending',
+                    createdAt: Date.now(),
+                    completedAt: null,
+                    ratedByProposer: false,
+                    ratedByReceiver: false,
+                    snapshots: [],
+                    coinMoves: []
+                };
+
+                if (myItem) {
+                    trade.snapshots.push({ itemId: myItem.id, ownerId: currentUser.id });
+                    myItem.status = 'reserved';
+                }
+                trade.snapshots.push({ itemId: targetItem.id, ownerId: targetItem.ownerId });
+                targetItem.status = 'reserved';
+
+                DB.trades.push(trade);
+
+                let notifText = `${currentUser.name} propôs `;
+                if (myItem && offerCoins > 0) {
+                    notifText += `troca: "${myItem.title}" + ${fmt(offerCoins)} moedas por "${targetItem.title}".`;
+                } else if (myItem) {
+                    notifText += `troca: "${myItem.title}" por "${targetItem.title}".`;
+                } else {
+                    notifText += `${fmt(offerCoins)} moedas por "${targetItem.title}".`;
+                }
+                if (message) notifText += ` Msg: "${message}"`;
+                notify(targetItem.ownerId, notifText);
+
+                save();
+                closeModal('tradeProposalModal');
+                closeModal('detailModal');
+                renderAll();
+                showToast('Oferta enviada! Aguarde a resposta.', 'success');
+            } catch (error) {
+                console.error('Erro ao propor troca:', error);
+                showToast('Erro ao enviar proposta.', 'error');
+            }
+        }
+    );
+}
+
+/**
+ * Aceita uma negociação pendente (compra ou troca)
  */
 function acceptTrade(tradeId) {
     const t = DB.trades.find(x => x.id === tradeId);
@@ -147,7 +247,8 @@ function acceptTrade(tradeId) {
     }
 
     try {
-        if (t.type === 'purchase') {
+        if (t.type === 'purchase' || (!t.proposerItemId && t.coins > 0)) {
+            // Aquisição só com moedas
             const item = getItem(t.receiverItemId);
             const buyer = getUser(t.proposerId);
             if (!item || !buyer) {
@@ -160,13 +261,13 @@ function acceptTrade(tradeId) {
             if (buyer.coins < t.coins) {
                 t.status = 'rejected';
                 item.status = 'available';
-                notify(buyer.id, 'Proposta recusada: saldo insuficiente.');
+                notify(buyer.id, 'Proposta recusada: saldo insuficiente de moedas.');
                 save();
                 renderAll();
                 return;
             }
-            changeCoins(buyer, -t.coins, `Compra: ${item.title}`);
-            changeCoins(currentUser, t.coins, `Venda: ${item.title}`);
+            changeCoins(buyer, -t.coins, `Aquisição: ${item.title}`);
+            changeCoins(currentUser, t.coins, `Cessão: ${item.title}`);
             item.ownerId = buyer.id;
             item.status = 'sold';
             t.coinMoves = [
@@ -175,17 +276,18 @@ function acceptTrade(tradeId) {
             ];
             t.status = 'completed';
             t.completedAt = Date.now();
+            if (!currentUser.stats) currentUser.stats = {};
             currentUser.stats.sales = (currentUser.stats.sales || 0) + 1;
-            notify(buyer.id, `Compra de "${item.title}" confirmada!`);
-            showToast('Venda concluída.', 'success');
+            notify(buyer.id, `Aquisição de "${item.title}" confirmada!`);
+            showToast('Negócio concluído.', 'success');
         } else if (t.type === 'trade') {
-            const proposerItem = getItem(t.proposerItemId);
+            const proposerItem = t.proposerItemId ? getItem(t.proposerItemId) : null;
             const receiverItem = getItem(t.receiverItemId);
-            if (!proposerItem || !receiverItem) {
+            if (!receiverItem) {
                 t.status = 'cancelled';
                 save();
                 renderAll();
-                showToast('Itens não encontrados, negociação cancelada.', 'error');
+                showToast('Item não encontrado. Negociação cancelada.', 'error');
                 return;
             }
 
@@ -199,38 +301,50 @@ function acceptTrade(tradeId) {
                 return;
             }
 
-            // Transferência de propriedade: troca os donos
-            proposerItem.ownerId = receiver.id; // vai para o receiver
-            receiverItem.ownerId = proposer.id; // vai para o proposer
+            // Transferência de propriedade dos itens
+            if (proposerItem) {
+                proposerItem.ownerId = receiver.id;
+                proposerItem.status = 'sold';
+            }
+            receiverItem.ownerId = proposer.id;
+            receiverItem.status = 'sold';
 
-            // Se houver compensação em moedas (não usado atualmente, mas preparado)
+            // Moedas extras na troca (se houver)
             if (t.coins > 0) {
                 if (proposer.coins < t.coins) {
-                    t.status = 'rejected';
-                    proposerItem.status = 'available';
+                    // Reverte reservas
+                    if (proposerItem) proposerItem.status = 'available';
                     receiverItem.status = 'available';
-                    notify(proposer.id, 'Proposta recusada: saldo insuficiente.');
+                    if (proposerItem) proposerItem.ownerId = proposer.id;
+                    receiverItem.ownerId = receiver.id;
+                    t.status = 'rejected';
+                    notify(proposer.id, 'Proposta recusada: saldo insuficiente de moedas.');
                     save();
                     renderAll();
                     return;
                 }
-                changeCoins(proposer, -t.coins, `Troca: ${proposerItem.title} por ${receiverItem.title}`);
-                changeCoins(receiver, t.coins, `Troca: ${proposerItem.title} por ${receiverItem.title}`);
+                changeCoins(proposer, -t.coins, `Troca (complemento em moedas)`);
+                changeCoins(receiver, t.coins, `Troca (complemento em moedas)`);
                 t.coinMoves = [
                     { userId: proposer.id, delta: -t.coins },
                     { userId: receiver.id, delta: t.coins }
                 ];
             }
 
-            proposerItem.status = 'sold';
-            receiverItem.status = 'sold';
             t.status = 'completed';
             t.completedAt = Date.now();
+            if (!proposer.stats) proposer.stats = {};
+            if (!receiver.stats) receiver.stats = {};
             proposer.stats.barters = (proposer.stats.barters || 0) + 1;
             receiver.stats.barters = (receiver.stats.barters || 0) + 1;
-            notify(proposer.id, `Troca de "${proposerItem.title}" por "${receiverItem.title}" confirmada!`);
+
+            const msg = proposerItem
+                ? `Troca de "${proposerItem.title}" por "${receiverItem.title}" confirmada!`
+                : `Troca por "${receiverItem.title}" confirmada!`;
+            notify(proposer.id, msg);
             showToast('Troca concluída!', 'success');
         }
+
         save();
         afterLoginUI();
         renderAll();
@@ -241,8 +355,7 @@ function acceptTrade(tradeId) {
 }
 
 /**
- * Rejeita ou cancela uma negociação pendente.
- * @param {number} tradeId - ID da negociação
+ * Rejeita ou cancela uma negociação pendente
  */
 function rejectTrade(tradeId) {
     const t = DB.trades.find(x => x.id === tradeId);
@@ -253,7 +366,7 @@ function rejectTrade(tradeId) {
     t.status = wasReceiver ? 'rejected' : 'cancelled';
 
     try {
-        if (t.type === 'purchase') {
+        if (t.type === 'purchase' || !t.proposerItemId) {
             const item = getItem(t.receiverItemId);
             if (item && item.status === 'reserved') item.status = 'available';
         } else if (t.type === 'trade') {
@@ -273,9 +386,7 @@ function rejectTrade(tradeId) {
 }
 
 /**
- * Abre o modal de avaliação para um negócio concluído.
- * @param {number} tradeId - ID da negociação
- * @param {number} targetUserId - ID do usuário a avaliar
+ * Modal de avaliação
  */
 function openRatingModal(tradeId, targetUserId) {
     if (!currentUser) return;
@@ -310,7 +421,7 @@ function openRatingModal(tradeId, targetUserId) {
 }
 
 /**
- * Envia a avaliação da contraparte.
+ * Envia avaliação + comentário
  */
 function submitRating() {
     const tradeId = ratingTradeId;
@@ -346,7 +457,7 @@ function submitRating() {
 }
 
 /**
- * Renderiza as listas de negociações do usuário.
+ * Lista de negociações do usuário
  */
 function renderTrades() {
     if (!currentUser) return;
@@ -358,15 +469,34 @@ function renderTrades() {
     const outgoing = mine.filter(t => t.status === 'pending' && t.proposerId === currentUser.id).reverse();
     const done = mine.filter(t => t.status !== 'pending').reverse();
 
+    const statusLabel = {
+        pending: 'Pendente',
+        completed: 'Concluído',
+        rejected: 'Recusado',
+        cancelled: 'Cancelado'
+    };
+
     const renderRow = (t) => {
         const other = getUser(t.proposerId === currentUser.id ? t.receiverId : t.proposerId);
-        const item = getItem(t.receiverItemId) || getItem(t.proposerItemId);
-        const itemLabel = item ? ` – ${esc(item.title)}` : ' – Item removido';
-        let btns = '';
+        const wanted = getItem(t.receiverItemId);
+        const offered = t.proposerItemId ? getItem(t.proposerItemId) : null;
 
+        let desc = '';
+        if (t.type === 'purchase' || (!offered && t.coins > 0)) {
+            desc = `🪙 ${fmt(t.coins)} moedas por "${wanted ? esc(wanted.title) : 'item removido'}"`;
+        } else {
+            desc = `"${offered ? esc(offered.title) : 'item'}"`;
+            if (t.coins > 0) desc += ` + 🪙 ${fmt(t.coins)}`;
+            desc += ` ⇄ "${wanted ? esc(wanted.title) : 'item removido'}"`;
+        }
+        if (t.message) {
+            desc += `<br><em class="text-muted fs-sm">"${esc(t.message)}"</em>`;
+        }
+
+        let btns = '';
         if (t.status === 'pending') {
             if (t.receiverId === currentUser.id) {
-                btns = `<button type="button" class="btn" onclick="acceptTrade(${t.id})">Aceitar</button> 
+                btns = `<button type="button" class="btn" onclick="acceptTrade(${t.id})">Aceitar</button>
                         <button type="button" class="btn btn-danger" onclick="rejectTrade(${t.id})">Recusar</button>`;
             } else {
                 btns = `<button type="button" class="btn btn-danger" onclick="rejectTrade(${t.id})">Cancelar</button>`;
@@ -376,22 +506,27 @@ function renderTrades() {
                             (t.receiverId === currentUser.id && !t.ratedByReceiver);
             if (canRate) {
                 const otherId = t.proposerId === currentUser.id ? t.receiverId : t.proposerId;
-                btns += `<button type="button" class="btn btn-secondary" onclick="openRatingModal(${t.id}, ${otherId})">Avaliar</button>`;
+                btns += `<button type="button" class="btn btn-secondary" onclick="openRatingModal(${t.id}, ${otherId})">⭐ Avaliar</button>`;
             }
         }
 
         const otherName = other ? esc(other.name) : '?';
+        const typeLabel = (t.type === 'purchase' || (!t.proposerItemId && t.coins > 0)) ? 'Moedas' : 'Troca';
+
         return `<li class="proposal-item">
-            <strong>#${t.id}</strong> ${t.type === 'purchase' ? 'Compra' : 'Troca'} com ${otherName}${itemLabel}<br>
-            <small>${t.status}</small>
-            <div>${btns}</div>
+            <div>
+                <strong>#${t.id}</strong> · ${typeLabel} com <strong>${otherName}</strong><br>
+                ${desc}<br>
+                <small class="text-muted">${statusLabel[t.status] || t.status}</small>
+            </div>
+            <div class="mt-2">${btns}</div>
         </li>`;
     };
 
     const incomingEl = document.getElementById('incomingTrades');
     const outgoingEl = document.getElementById('outgoingTrades');
     const doneEl = document.getElementById('doneTrades');
-    if (incomingEl) incomingEl.innerHTML = incoming.map(renderRow).join('') || '<li>Nenhuma proposta recebida.</li>';
-    if (outgoingEl) outgoingEl.innerHTML = outgoing.map(renderRow).join('') || '<li>Nenhuma proposta enviada.</li>';
-    if (doneEl) doneEl.innerHTML = done.map(renderRow).join('') || '<li>Nenhum negócio concluído.</li>';
+    if (incomingEl) incomingEl.innerHTML = incoming.map(renderRow).join('') || '<li class="text-muted">Nenhuma proposta recebida.</li>';
+    if (outgoingEl) outgoingEl.innerHTML = outgoing.map(renderRow).join('') || '<li class="text-muted">Nenhuma proposta enviada.</li>';
+    if (doneEl) doneEl.innerHTML = done.map(renderRow).join('') || '<li class="text-muted">Nenhum negócio concluído.</li>';
 }

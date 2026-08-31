@@ -280,17 +280,17 @@ function itemCard(i, index) {
         ? `<img class="item-image" src="${img}" alt="${esc(i.title)}" loading="lazy">`
         : `<div class="image-placeholder">${CAT_ICONS[i.category] || '📦'}</div>`;
 
-    // Preço
+    // Preço em moedas virtuais (sem R$)
     let priceDisplay;
     if (i.price > 0 && i.type !== 'trade') {
-        priceDisplay = `<span class="coin-icon">🪙</span> ${fmt(i.price)}`;
+        priceDisplay = `<span class="coin-icon">🪙</span> ${fmt(i.price)} <span class="fs-xs text-muted">moedas</span>`;
     } else {
-        priceDisplay = '<span class="trade-badge">🔄 Troca</span>';
+        priceDisplay = '<span class="trade-badge">🔄 Troca de item</span>';
     }
 
-    // Tags de tipo
+    // Tags de tipo (Moedas / Troca)
     const typeTags =
-        (i.price > 0 && i.type !== 'trade' ? '<span class="mini-tag sale">Venda</span>' : '') +
+        (i.price > 0 && i.type !== 'trade' ? '<span class="mini-tag sale">Moedas</span>' : '') +
         (i.acceptTrades ? '<span class="mini-tag trade">Troca</span>' : '');
 
     // Distância / localização
@@ -321,7 +321,7 @@ function itemCard(i, index) {
     if (currentUser && i.ownerId !== currentUser.id && i.status === 'available') {
         actionButtons = `
             <button class="btn-action primary" onclick="event.stopPropagation(); openDetail(${i.id})">Ver detalhes</button>
-            ${i.acceptTrades ? `<button class="btn-action secondary" onclick="event.stopPropagation(); submitTradeProposal(${i.id})">Trocar</button>` : ''}
+            ${i.acceptTrades ? `<button class="btn-action secondary" onclick="event.stopPropagation(); openTradeProposal(${i.id})">Trocar</button>` : ''}
         `;
     } else {
         actionButtons = `
@@ -494,6 +494,9 @@ function onTypeChange() {
     if (priceGroup) {
         priceGroup.style.display = type === 'trade' ? 'none' : '';
     }
+    // Atualiza label do preço para deixar claro que são moedas
+    const priceLabel = document.querySelector('#priceGroup label');
+    if (priceLabel) priceLabel.textContent = 'Preço em moedas *';
 }
 
 function handleImageUpload(input) {
@@ -650,22 +653,22 @@ function openDetail(itemId) {
 
     // Tags
     const typeTags =
-        (item.price > 0 && item.type !== 'trade' ? '<span class="mini-tag sale">Venda</span> ' : '') +
-        (item.acceptTrades ? '<span class="mini-tag trade">Troca</span>' : '');
+        (item.price > 0 && item.type !== 'trade' ? '<span class="mini-tag sale">Moedas</span> ' : '') +
+        (item.acceptTrades ? '<span class="mini-tag trade">Troca de item</span>' : '');
 
-    // Preço destacado
+    // Preço em moedas (sem R$)
     const priceHtml = item.price > 0 && item.type !== 'trade'
-        ? `<div class="detail-price">🪙 ${fmt(item.price)}</div>`
-        : `<div class="detail-price"><span class="trade-badge">🔄 Somente troca</span></div>`;
+        ? `<div class="detail-price">🪙 ${fmt(item.price)} <span class="fs-sm" style="font-weight:500;opacity:0.8">moedas</span></div>`
+        : `<div class="detail-price"><span class="trade-badge">🔄 Somente troca de item</span></div>`;
 
     // Botões de ação
     let actionButtons = '';
     if (currentUser && item.ownerId !== currentUser.id && item.status === 'available') {
         if (item.price > 0 && item.type !== 'trade') {
-            actionButtons += `<button class="btn btn-warning" onclick="buyWithCoins(${item.id})">🛒 Comprar por ${fmt(item.price)}</button>`;
+            actionButtons += `<button class="btn btn-warning" onclick="buyWithCoins(${item.id})">🪙 Adquirir por ${fmt(item.price)} moedas</button>`;
         }
         if (item.acceptTrades) {
-            actionButtons += `<button class="btn btn-secondary" onclick="submitTradeProposal(${item.id})">🔄 Propor troca</button>`;
+            actionButtons += `<button class="btn btn-secondary" onclick="openTradeProposal(${item.id})">🔄 Propor troca de item</button>`;
         }
         actionButtons += `<button class="btn" onclick="openChat(${item.ownerId})">💬 Conversar</button>`;
         actionButtons += `<button class="btn btn-danger" onclick="openDenounce(${item.id})">Denunciar</button>`;
@@ -731,6 +734,38 @@ function deleteItem(itemId) {
         renderProfile();
     }
     showToast('Anúncio excluído.', 'warning');
+}
+
+
+/**
+ * GPS no formulário de cadastro
+ */
+function getRegLocationFromGPS() {
+    if (!navigator.geolocation) {
+        showToast('Geolocalização não suportada neste navegador.', 'error');
+        return;
+    }
+    navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            document.getElementById('rgLat').value = lat;
+            document.getElementById('rgLng').value = lng;
+            try {
+                if (typeof reverseGeocode === 'function') {
+                    const name = await reverseGeocode(lat, lng);
+                    document.getElementById('rgLocation').value = name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                } else {
+                    document.getElementById('rgLocation').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                }
+                showToast('Localização definida.', 'success');
+            } catch {
+                document.getElementById('rgLocation').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            }
+        },
+        () => showToast('Não foi possível obter sua localização.', 'error'),
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
 }
 
 function openDenounce(itemId) {

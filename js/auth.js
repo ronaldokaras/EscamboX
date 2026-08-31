@@ -12,6 +12,19 @@ function openAuth(tab) {
     const loginPass = document.getElementById('liPass');
     if (loginEmail) loginEmail.value = '';
     if (loginPass) loginPass.value = '';
+    // Limpa também campos de registro
+    const rgName = document.getElementById('rgName');
+    const rgEmail = document.getElementById('rgEmail');
+    const rgPass = document.getElementById('rgPass');
+    const rgLocation = document.getElementById('rgLocation');
+    const rgLat = document.getElementById('rgLat');
+    const rgLng = document.getElementById('rgLng');
+    if (rgName) rgName.value = '';
+    if (rgEmail) rgEmail.value = '';
+    if (rgPass) rgPass.value = '';
+    if (rgLocation) rgLocation.value = '';
+    if (rgLat) rgLat.value = '';
+    if (rgLng) rgLng.value = '';
     setAlert('logAlert', '');
     setAlert('regAlert', '');
     openModal('authModal');
@@ -129,7 +142,7 @@ async function doLogin(ev) {
 }
 
 /**
- * Processa o registro de novo usuário.
+ * Processa o registro de novo usuário (com localização).
  * @param {Event} ev - Evento de submit
  */
 async function doRegister(ev) {
@@ -142,11 +155,18 @@ async function doRegister(ev) {
         const nameInput = document.getElementById('rgName');
         const emailInput = document.getElementById('rgEmail');
         const passInput = document.getElementById('rgPass');
+        const locationInput = document.getElementById('rgLocation');
+        const latInput = document.getElementById('rgLat');
+        const lngInput = document.getElementById('rgLng');
+
         if (!nameInput || !emailInput || !passInput) return;
 
         const name = nameInput.value.trim();
         const email = norm(emailInput.value);
         const pw = passInput.value;
+        const location = locationInput ? locationInput.value.trim() : '';
+        const lat = latInput && latInput.value ? parseFloat(latInput.value) : null;
+        const lng = lngInput && lngInput.value ? parseFloat(lngInput.value) : null;
 
         if (name.length < 2) {
             setAlert('regAlert', 'Informe seu nome (mín. 2 caracteres).');
@@ -163,6 +183,11 @@ async function doRegister(ev) {
             focusField('rgPass');
             return;
         }
+        if (!location || location.length < 2) {
+            setAlert('regAlert', 'Informe onde você mora (cidade / bairro).');
+            focusField('rgLocation');
+            return;
+        }
         if (DB.users.some(u => norm(u.email) === email)) {
             setAlert('regAlert', 'E-mail já cadastrado.');
             focusField('rgEmail');
@@ -177,6 +202,10 @@ async function doRegister(ev) {
             passHash: await hashPassword(pw),
             role: 'user',
             coins: 0,
+            // Localização do usuário (para filtros de proximidade)
+            location: location,
+            lat: Number.isFinite(lat) ? lat : null,
+            lng: Number.isFinite(lng) ? lng : null,
             createdAt: now,
             favs: [],
             notifications: [],
@@ -192,12 +221,11 @@ async function doRegister(ev) {
             ratings: []
         };
 
-        // Bônus de boas-vindas (20 moedas)
+        // Bônus de boas-vindas (20 moedas virtuais)
         changeCoins(user, 20, 'Bônus de boas-vindas');
         DB.users.push(user);
 
-        // Notificação de boas-vindas
-        notify(user.id, 'Conta criada! Você ganhou 20 moedas.');
+        notify(user.id, 'Conta criada! Você ganhou 20 moedas virtuais. Use-as em trocas e aquisições.');
 
         currentUser = user;
         localStorage.setItem(KEYS.session, String(user.id));
@@ -229,14 +257,12 @@ function logout() {
 
 /**
  * Restaura a sessão a partir do localStorage.
- * Se a sessão for inválida (usuário não existe), limpa o storage.
  */
 function restoreSession() {
     const sid = parseInt(localStorage.getItem(KEYS.session), 10);
     if (sid) {
         currentUser = getUser(sid) || null;
         if (!currentUser) {
-            // Sessão inválida, limpa
             localStorage.removeItem(KEYS.session);
         }
     }
