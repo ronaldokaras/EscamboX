@@ -95,8 +95,26 @@ function fmtDateTime(ts) {
 }
 
 /**
- * Gera hash da senha. Tenta usar SHA-256 do Web Crypto; caso indisponível,
- * usa um hash simples (fallback) com salt fixo.
+ * Tempo relativo amigável (ex.: "há 2 dias", "há 5 horas")
+ * @param {number} ts - Timestamp
+ * @returns {string}
+ */
+function fmtRelative(ts) {
+    if (!ts) return '';
+    const diff = Date.now() - ts;
+    const sec = Math.floor(diff / 1000);
+    if (sec < 60) return 'agora';
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `há ${min} ${plural(min, 'minuto', 'minutos')}`;
+    const h = Math.floor(min / 60);
+    if (h < 24) return `há ${h} ${plural(h, 'hora', 'horas')}`;
+    const d = Math.floor(h / 24);
+    if (d < 30) return `há ${d} ${plural(d, 'dia', 'dias')}`;
+    return fmtDate(ts);
+}
+
+/**
+ * Gera hash da senha. Tenta SHA-256; fallback djb2 com salt.
  * @param {string} pw - Senha
  * @returns {Promise<string>} Hash da senha
  */
@@ -110,7 +128,6 @@ async function hashPassword(pw) {
     } catch (e) {
         console.warn('Web Crypto indisponível, usando fallback.', e);
     }
-    // Fallback simples (djb2 com salt)
     let h = 5381;
     for (let i = 0; i < pw.length; i++) {
         h = ((h << 5) + h + pw.charCodeAt(i)) >>> 0;
@@ -125,27 +142,22 @@ async function hashPassword(pw) {
  */
 function safeImageUrl(url) {
     const u = String(url || '').trim();
-    // Aceita http, https ou data:image (png, jpeg, webp, gif, svg)
-    if (/^(https?:\/\/[^\s]+|data:image\/(png|jpeg|webp|gif|svg\+xml);base64,[^\s]+)$/i.test(u)) {
+    if (/^(https?:\/\/[^\s]+|data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,[^\s]+)$/i.test(u)) {
         return esc(u);
     }
     return '';
 }
 
 /**
- * Calcula a distância em km entre dois pontos geográficos (fórmula de Haversine).
- * @param {number} lat1 - Latitude do ponto 1
- * @param {number} lon1 - Longitude do ponto 1
- * @param {number} lat2 - Latitude do ponto 2
- * @param {number} lon2 - Longitude do ponto 2
- * @returns {number|null} Distância em km ou null se parâmetros inválidos
+ * Distância em km (Haversine).
+ * @returns {number|null}
  */
 function distance(lat1, lon1, lat2, lon2) {
     const toRad = (deg) => deg * Math.PI / 180;
     const valid = [lat1, lon1, lat2, lon2].every(v => typeof v === 'number' && Number.isFinite(v));
     if (!valid) return null;
 
-    const R = 6371; // raio médio da Terra em km
+    const R = 6371;
     const dLat = toRad(lat2 - lat1);
     const dLon = toRad(lon2 - lon1);
     const a =
@@ -157,13 +169,13 @@ function distance(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Obtém a localização do usuário via Geolocation API.
- * @returns {Promise<{lat: number, lng: number}>} Coordenadas
+ * Geolocalização do navegador.
+ * @returns {Promise<{lat: number, lng: number}>}
  */
 function getUserLocation() {
     return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
-            reject('Geolocalização não suportada pelo navegador.');
+            reject(new Error('Geolocalização não suportada pelo navegador.'));
             return;
         }
         navigator.geolocation.getCurrentPosition(
@@ -171,16 +183,16 @@ function getUserLocation() {
             (err) => {
                 switch (err.code) {
                     case err.PERMISSION_DENIED:
-                        reject('Permissão de localização negada.');
+                        reject(new Error('Permissão de localização negada.'));
                         break;
                     case err.POSITION_UNAVAILABLE:
-                        reject('Localização indisponível.');
+                        reject(new Error('Localização indisponível.'));
                         break;
                     case err.TIMEOUT:
-                        reject('Tempo esgotado ao obter localização.');
+                        reject(new Error('Tempo esgotado ao obter localização.'));
                         break;
                     default:
-                        reject('Erro ao obter localização.');
+                        reject(new Error('Erro ao obter localização.'));
                 }
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
@@ -189,14 +201,26 @@ function getUserLocation() {
 }
 
 /**
- * Geocodifica um endereço usando Nominatim (OpenStreetMap).
- * @param {string} address - Endereço ou cidade
+ * Headers recomendados pelo Nominatim (uso justo da API).
+ */
+function nominatimHeaders() {
+    return {
+        'Accept': 'application/json',
+        'Accept-Language': 'pt-BR,pt;q=0.9'
+    };
+}
+
+/**
+ * Geocodifica endereço (Nominatim / OpenStreetMap).
+ * @param {string} address
  * @returns {Promise<{lat: number, lng: number, name: string}|null>}
  */
 async function geocodeAddress(address) {
     try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
-        const response = await fetch(url);
+        const q = String(address || '').trim();
+        if (!q) return null;
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&countrycodes=br`;
+        const response = await fetch(url, { headers: nominatimHeaders() });
         if (!response.ok) throw new Error('Erro na geocodificação');
         const data = await response.json();
         if (data && data.length > 0) {
@@ -204,7 +228,7 @@ async function geocodeAddress(address) {
             return {
                 lat: parseFloat(r.lat),
                 lng: parseFloat(r.lon),
-                name: r.display_name || address
+                name: r.display_name || q
             };
         }
         return null;
@@ -216,14 +240,15 @@ async function geocodeAddress(address) {
 
 /**
  * Geocodificação reversa: coordenadas -> nome.
- * @param {number} lat - Latitude
- * @param {number} lng - Longitude
+ * @param {number} lat
+ * @param {number} lng
  * @returns {Promise<string|null>}
  */
 async function reverseGeocode(lat, lng) {
     try {
-        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
-        const response = await fetch(url);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=0`;
+        const response = await fetch(url, { headers: nominatimHeaders() });
         if (!response.ok) throw new Error('Erro na geocodificação reversa');
         const data = await response.json();
         return data.display_name || null;
@@ -235,8 +260,8 @@ async function reverseGeocode(lat, lng) {
 
 /**
  * Atalho para document.getElementById.
- * @param {string} id - ID do elemento
- * @returns {HTMLElement|null} Elemento ou null
+ * @param {string} id
+ * @returns {HTMLElement|null}
  */
 function $id(id) {
     return typeof document !== 'undefined' ? document.getElementById(id) : null;

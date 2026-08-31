@@ -34,84 +34,111 @@ function renderProfile() {
     if (nameInput) {
         nameInput.value = currentUser.name;
     }
+
+    // Meta: e-mail, localização e data de cadastro
     const profMeta = document.getElementById('profMeta');
     if (profMeta) {
-        profMeta.innerHTML = `${esc(currentUser.email)} · Membro desde ${fmtDate(currentUser.createdAt)}`;
+        const loc = currentUser.location
+            ? `📍 ${esc(currentUser.location)}`
+            : '📍 Localização não informada';
+        profMeta.innerHTML = `${esc(currentUser.email)} · ${loc} · Membro desde ${fmtDate(currentUser.createdAt)}`;
     }
 
     // Estatísticas
     const myItems = DB.items.filter(i => i.ownerId === currentUser.id);
     const totalNegocios = (currentUser.stats.sales || 0) + (currentUser.stats.barters || 0);
+    const avgRating = currentUser.ratings.length
+        ? (currentUser.ratings.reduce((s, r) => s + (r.stars || 0), 0) / currentUser.ratings.length).toFixed(1)
+        : '—';
+
     const profStats = document.getElementById('profStats');
     if (profStats) {
         profStats.innerHTML = `
             <div class="stat-card"><div class="stat-value">${myItems.length}</div><div class="stat-label">Anúncios</div></div>
-            <div class="stat-card"><div class="stat-value">${totalNegocios}</div><div class="stat-label">Negócios</div></div>
+            <div class="stat-card"><div class="stat-value">${totalNegocios}</div><div class="stat-label">Escambos</div></div>
             <div class="stat-card"><div class="stat-value">${currentUser.ratings.length}</div><div class="stat-label">Avaliações</div></div>
+            <div class="stat-card"><div class="stat-value">${avgRating}</div><div class="stat-label">Média ⭐</div></div>
+            <div class="stat-card"><div class="stat-value">🪙 ${fmt(currentUser.coins)}</div><div class="stat-label">Saldo</div></div>
         `;
     }
 
-    // Avaliações
+    // Avaliações recebidas
     const revCount = document.getElementById('revCount');
     if (revCount) revCount.textContent = currentUser.ratings.length;
     const reviewsList = document.getElementById('reviewsList');
     if (reviewsList) {
-        reviewsList.innerHTML = currentUser.ratings.map(r => {
-            const stars = '⭐'.repeat(Math.max(0, Math.min(5, r.stars || 0)));
-            return `<li>${stars} – ${esc(r.comment || '')}</li>`;
-        }).join('') || '<li>Sem avaliações.</li>';
+        reviewsList.innerHTML = currentUser.ratings.length
+            ? currentUser.ratings.map(r => {
+                const who = getUser(r.by);
+                const stars = '⭐'.repeat(Math.max(0, Math.min(5, r.stars || 0)));
+                const when = r.ts ? fmtDate(r.ts) : '';
+                return `<li class="review-item">
+                    <strong>${stars}</strong>
+                    ${who ? ` · ${esc(who.name)}` : ''}
+                    ${when ? ` · <span class="text-muted fs-sm">${when}</span>` : ''}
+                    ${r.comment ? `<br><span class="text-muted">${esc(r.comment)}</span>` : ''}
+                </li>`;
+            }).join('')
+            : '<li class="text-muted">Sem avaliações ainda.</li>';
     }
 
-    // Meus anúncios
+    // Meus anúncios (usa itemCard com índice)
     const myItemsGrid = document.getElementById('myItemsGrid');
     if (myItemsGrid) {
         if (typeof itemCard === 'function') {
-            myItemsGrid.innerHTML = myItems.map(itemCard).join('') || '<p>Nenhum item publicado.</p>';
+            myItemsGrid.innerHTML = myItems.length
+                ? myItems.map((item, idx) => itemCard(item, idx)).join('')
+                : '<p class="text-muted empty-state">Nenhum item publicado.</p>';
         } else {
             myItemsGrid.innerHTML = myItems.map(i => `
                 <div class="card-item">
                     <div class="info">
                         <strong>${esc(i.title)}</strong><br>
-                        ${i.price > 0 ? 'R$ ' + fmt(i.price) : 'Troca'}
+                        ${i.price > 0 ? '🪙 ' + fmt(i.price) + ' moedas' : '🔄 Troca de item'}
                     </div>
                 </div>
-            `).join('') || '<p>Nenhum item publicado.</p>';
+            `).join('') || '<p class="text-muted">Nenhum item publicado.</p>';
         }
     }
 
     // Favoritos
     const favItemsGrid = document.getElementById('favItemsGrid');
     if (favItemsGrid) {
-        const favItems = currentUser.favs
+        const favItems = (currentUser.favs || [])
             .map(id => getItem(id))
             .filter(Boolean);
         if (typeof itemCard === 'function') {
-            favItemsGrid.innerHTML = favItems.map(itemCard).join('') || '<p>Nenhum favorito.</p>';
+            favItemsGrid.innerHTML = favItems.length
+                ? favItems.map((item, idx) => itemCard(item, idx)).join('')
+                : '<p class="text-muted empty-state">Nenhum favorito.</p>';
         } else {
             favItemsGrid.innerHTML = favItems.map(i => `
                 <div class="card-item">
                     <div class="info">
-                        <strong>${esc(i.title)}</strong>
+                        <strong>${esc(i.title)}</strong><br>
+                        ${i.price > 0 ? '🪙 ' + fmt(i.price) + ' moedas' : '🔄 Troca'}
                     </div>
                 </div>
-            `).join('') || '<p>Nenhum favorito.</p>';
+            `).join('') || '<p class="text-muted">Nenhum favorito.</p>';
         }
     }
 
     // Extrato de moedas
     const ledger = DB.ledger
         .filter(l => l.userId === currentUser.id)
-        .slice(-20)
+        .slice(-30)
         .reverse();
     const ledgerBody = document.getElementById('ledgerBody');
     if (ledgerBody) {
-        ledgerBody.innerHTML = ledger.map(l => `
-            <tr>
-                <td>${fmtDate(l.ts)}</td>
-                <td>${l.delta > 0 ? '+' : ''}${l.delta}</td>
-                <td>${esc(l.reason || '')}</td>
-            </tr>
-        `).join('') || '<tr><td colspan="3">Sem movimentos.</td></tr>';
+        ledgerBody.innerHTML = ledger.length
+            ? ledger.map(l => `
+                <tr>
+                    <td>${fmtDate(l.ts)}</td>
+                    <td class="${l.delta > 0 ? 'text-success' : ''}">${l.delta > 0 ? '+' : ''}${fmt(l.delta)} 🪙</td>
+                    <td>${esc(l.reason || '')}</td>
+                </tr>
+            `).join('')
+            : '<tr><td colspan="3" class="text-muted">Sem movimentos.</td></tr>';
     }
 
     updateWalletUI();
@@ -166,7 +193,6 @@ async function changePassword() {
 
         currentUser.passHash = await hashPassword(nw);
         save();
-        // Limpar campos após sucesso
         pwCurrent.value = '';
         pwNew.value = '';
         showToast('Senha alterada com sucesso.', 'success');
@@ -209,7 +235,6 @@ function importData(input) {
     reader.onload = e => {
         try {
             const data = JSON.parse(e.target.result);
-            // Validar estrutura mínima
             if (!data || typeof data !== 'object' ||
                 !Array.isArray(data.users) ||
                 !Array.isArray(data.items) ||
@@ -221,7 +246,6 @@ function importData(input) {
                 return;
             }
 
-            // Perguntar confirmação antes de substituir dados
             askConfirm('Importar dados', 'Isso substituirá todos os dados atuais. Deseja continuar?', () => {
                 DB = data;
                 save();
@@ -237,6 +261,5 @@ function importData(input) {
         showToast('Erro ao ler arquivo.', 'error');
     };
     reader.readAsText(file);
-    // Limpar input para permitir reimportar o mesmo arquivo
     input.value = '';
 }

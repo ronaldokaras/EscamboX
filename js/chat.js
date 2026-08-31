@@ -1,15 +1,18 @@
 'use strict';
 
-// Chat básico
+// Chat básico entre usuários (negociação)
 let currentChatPartnerId = null;
+let chatListenersReady = false;
 
 /**
  * Retorna o chat entre o usuário logado e o parceiro atual.
- * @returns {Object|null} Chat ou null se não existir
+ * @returns {Object|null}
  */
 function getChatBetween() {
     if (!currentUser || !currentChatPartnerId) return null;
+    if (!Array.isArray(DB.chats)) DB.chats = [];
     return DB.chats.find(c =>
+        Array.isArray(c.participants) &&
         c.participants.includes(currentUser.id) &&
         c.participants.includes(currentChatPartnerId)
     ) || null;
@@ -17,7 +20,7 @@ function getChatBetween() {
 
 /**
  * Abre o chat com outro usuário.
- * @param {number} otherUserId - ID do outro usuário
+ * @param {number} otherUserId
  */
 function openChat(otherUserId) {
     if (!currentUser) {
@@ -25,27 +28,53 @@ function openChat(otherUserId) {
         return;
     }
 
-    if (!otherUserId || otherUserId === currentUser.id) {
+    const otherId = Number(otherUserId);
+    if (!otherId || otherId === currentUser.id) {
         showToast('Não é possível abrir chat com este usuário.', 'error');
         return;
     }
 
-    currentChatPartnerId = otherUserId;
+    const partner = getUser(otherId);
+    if (!partner) {
+        showToast('Usuário não encontrado.', 'error');
+        return;
+    }
+    if (partner.role === 'banned') {
+        showToast('Este usuário está indisponível.', 'warning');
+        return;
+    }
+
+    currentChatPartnerId = otherId;
 
     try {
+        if (!Array.isArray(DB.chats)) DB.chats = [];
+
         let chat = getChatBetween();
         if (!chat) {
             chat = {
                 id: nextId(),
-                participants: [currentUser.id, otherUserId],
-                messages: []
+                participants: [currentUser.id, otherId],
+                messages: [],
+                updatedAt: Date.now()
             };
             DB.chats.push(chat);
             save();
         }
 
+        // Título do modal
+        const titleEl = document.getElementById('chatTitle');
+        if (titleEl) {
+            titleEl.textContent = `Chat com ${partner.name}`;
+        }
+
         renderChatMessages();
         openModal('chatModal');
+
+        // Foca o campo de mensagem
+        const input = document.getElementById('chatInput');
+        if (input) setTimeout(() => input.focus(), 80);
+
+        initChatListeners();
     } catch (error) {
         console.error('Erro ao abrir chat:', error);
         showToast('Erro ao abrir chat.', 'error');
@@ -61,31 +90,31 @@ function renderChatMessages() {
 
     const chat = getChatBetween();
     if (!chat || !chat.messages || chat.messages.length === 0) {
-        box.innerHTML = '<div class="chat-empty">Sem mensagens. Inicie a conversa!</div>';
+        box.innerHTML = '<div class="chat-empty text-muted">Sem mensagens. Inicie a conversa sobre o item ou a troca!</div>';
         return;
     }
 
-    // Ordena mensagens por timestamp (crescente)
     const messages = [...chat.messages].sort((a, b) => (a.ts || 0) - (b.ts || 0));
 
     box.innerHTML = messages.map(m => {
-        const senderName = m.senderId === currentUser?.id
-            ? 'Você'
-            : esc(getUser(m.senderId)?.name || 'Usuário removido');
-        const time = m.ts ? new Date(m.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
         const isOwn = m.senderId === currentUser?.id;
+        const senderName = isOwn
+            ? 'Você'
+            : esc(getUser(m.senderId)?.name || 'Usuário');
+        const time = m.ts
+            ? new Date(m.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+            : '';
         return `
             <div class="chat-message ${isOwn ? 'own-message' : 'other-message'}">
                 <div class="chat-message-header">
                     <span class="sender">${senderName}</span>
-                    ${time ? `<span class="chat-time">${time}</span>` : ''}
+                    ${time ? `<span class="chat-time text-muted">${time}</span>` : ''}
                 </div>
                 <div class="chat-bubble">${esc(m.text)}</div>
             </div>
         `;
     }).join('');
 
-    // Auto-scroll para a última mensagem
     box.scrollTop = box.scrollHeight;
 }
 
@@ -94,7 +123,7 @@ function renderChatMessages() {
  */
 function sendChatMessage() {
     if (!currentUser || !currentChatPartnerId) {
-        showToast('Sessão expirada. Faça login novamente.', 'error');
+        showToast('Faça login para conversar.', 'error');
         return;
     }
 
@@ -107,11 +136,22 @@ function sendChatMessage() {
         input.focus();
         return;
     }
-
-    const chat = getChatBetween();
-    if (!chat) {
-        showToast('Chat não encontrado.', 'error');
+    if (text.length > 200) {
+        showToast('Mensagem muito longa (máx. 200 caracteres).', 'warning');
         return;
+    }
+
+    let chat = getChatBetween();
+    if (!chat) {
+        // Recria se sumiu
+        chat = {
+            id: nextId(),
+            participants: [currentUser.id, currentChatPartnerId],
+            messages: [],
+            updatedAt: Date.now()
+        };
+        if (!Array.isArray(DB.chats)) DB.chats = [];
+        DB.chats.push(chat);
     }
 
     if (sendBtn) sendBtn.disabled = true;
@@ -122,6 +162,16 @@ function sendChatMessage() {
             text,
             ts: Date.now()
         });
+        chat.updatedAt = Date.now();
+
+        // Notifica o parceiro
+        if (typeof notify === 'function') {
+            notify(
+                currentChatPartnerId,
+                `${currentUser.name} enviou uma mensagem no chat.`
+            );
+        }
+
         save();
         renderChatMessages();
         input.value = '';
@@ -135,21 +185,20 @@ function sendChatMessage() {
 }
 
 /**
- * Inicializa listeners do chat (chamado no init geral).
+ * Listeners do chat (Enter + botão). Só registra uma vez.
  */
 function initChatListeners() {
+    if (chatListenersReady) return;
     const input = document.getElementById('chatInput');
     const sendBtn = document.getElementById('sendChatBtn');
     if (!input || !sendBtn) return;
 
-    // Enviar com Enter
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendChatMessage();
         }
     });
-
-    // Enviar com clique no botão
     sendBtn.addEventListener('click', sendChatMessage);
+    chatListenersReady = true;
 }

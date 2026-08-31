@@ -1,6 +1,6 @@
 'use strict';
 
-// Inicialização
+// Inicialização da aplicação EscamboX
 let infiniteScrollObserver;
 
 /**
@@ -16,7 +16,7 @@ function setupInfiniteScroll() {
     if (!sentinel) return;
 
     infiniteScrollObserver = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting) {
+        if (entries[0].isIntersecting && typeof loadMore === 'function') {
             loadMore();
         }
     }, { rootMargin: '200px' });
@@ -29,89 +29,97 @@ function setupInfiniteScroll() {
  */
 async function init() {
     try {
-        // Carrega dados persistentes
+        // 1. Dados persistentes (seed se versão nova)
         loadData();
 
-        // Inicializa senhas (provavelmente criptografia ou seed)
+        // 2. Senhas dos usuários de demonstração
         await initPasswords();
-
-        // Salva estado inicial
         save();
 
-        // Aplica tema salvo
-        applyTheme(localStorage.getItem(KEYS.theme) || 'light');
+        // 3. Tema
+        const savedTheme = localStorage.getItem(KEYS.theme) || 'light';
+        if (typeof applyTheme === 'function') {
+            applyTheme(savedTheme);
+        } else {
+            document.documentElement.setAttribute('data-theme', savedTheme === 'dark' ? 'dark' : 'light');
+        }
 
-        // Restaura sessão do usuário (se houver)
+        // 4. Sessão
         restoreSession();
 
-        // Preenche selects de formulários (categorias, etc.)
-        populateFormSelects();
+        // 5. Formulários e filtros
+        if (typeof populateFormSelects === 'function') populateFormSelects();
+        if (typeof renderChips === 'function') renderChips();
 
-        // Renderiza chips de categorias
-        renderChips();
-
-        // Atualiza interface conforme autenticação
+        // 6. UI conforme login
         afterLoginUI();
 
-        // Renderiza todas as seções
-        renderAll();
+        // 7. Conteúdo
+        if (typeof renderAll === 'function') {
+            renderAll();
+        } else if (typeof renderGrid === 'function') {
+            renderGrid();
+        }
 
-        // Configura scroll infinito
+        // 8. Scroll infinito
         setupInfiniteScroll();
 
-        // --- Event Listeners Globais ---
+        // --- Eventos globais ---
 
-        // Fecha menus ao clicar fora deles
+        // Fecha menus ao clicar fora
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('.user-menu')) {
+            if (!e.target.closest('.user-menu') && typeof closeUserMenu === 'function') {
                 closeUserMenu();
             }
-            if (!e.target.closest('.notification-btn')) {
+            if (!e.target.closest('.notification-btn') && typeof closeNotifications === 'function') {
                 closeNotifications();
             }
         });
 
-        // Atalhos de teclado
+        // Teclado
         document.addEventListener('keydown', (e) => {
-            // Fecha modais e menus com Escape
             if (e.key === 'Escape') {
-                // Fecha todos os modais ativos
                 document.querySelectorAll('.modal.active').forEach((modal) => {
-                    modal.classList.remove('active');
-                    // Remove aria-hidden se estiver definido
-                    modal.setAttribute('aria-hidden', 'true');
+                    const id = modal.id;
+                    if (id && typeof closeModal === 'function') {
+                        closeModal(id);
+                    } else {
+                        modal.classList.remove('active');
+                        modal.setAttribute('aria-hidden', 'true');
+                    }
                 });
-
-                // Fecha menu do usuário e notificações
-                closeUserMenu();
-                closeNotifications();
+                if (typeof closeUserMenu === 'function') closeUserMenu();
+                if (typeof closeNotifications === 'function') closeNotifications();
             }
 
-            // Atalho "/" para focar na busca
-            if (e.key === '/' && !e.target.closest('input, textarea, select')) {
+            // "/" foca a busca
+            if (e.key === '/' && !e.target.closest('input, textarea, select, [contenteditable]')) {
                 e.preventDefault();
                 const searchInput = document.getElementById('searchInput');
-                if (searchInput) {
-                    searchInput.focus();
-                }
+                if (searchInput) searchInput.focus();
             }
         });
 
-        // Fecha modal ao clicar no backdrop (fora do conteúdo)
+        // Clique no backdrop fecha o modal
         document.querySelectorAll('.modal').forEach((modal) => {
             modal.addEventListener('mousedown', (e) => {
                 if (e.target === modal) {
-                    modal.classList.remove('active');
-                    modal.setAttribute('aria-hidden', 'true');
+                    const id = modal.id;
+                    if (id && typeof closeModal === 'function') {
+                        closeModal(id);
+                    } else {
+                        modal.classList.remove('active');
+                        modal.setAttribute('aria-hidden', 'true');
+                    }
                 }
             });
         });
 
+        console.log('EscamboX inicializado.');
     } catch (error) {
         console.error('Erro durante inicialização:', error);
-        // Opcional: exibir toast de erro para o usuário
         if (typeof showToast === 'function') {
-            showToast('Erro ao inicializar aplicação. Recarregue a página.', 'error');
+            showToast('Erro ao inicializar. Recarregue a página.', 'error');
         }
     }
 }
