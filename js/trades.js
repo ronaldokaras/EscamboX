@@ -185,6 +185,41 @@ function submitTradeProposal() {
             : `Oferecer ${fmt(offerCoins)} moedas por "${targetItem.title}"?`,
         () => {
             try {
+                // Modificar proposta existente (sem criar nova)
+                if (window._editingTradeId) {
+                    const existing = DB.trades.find(x => x.id === window._editingTradeId && x.status === 'pending');
+                    if (existing && existing.proposerId === currentUser.id) {
+                        // Liberar item antigo se mudou
+                        if (existing.proposerItemId && existing.proposerItemId !== offerItemId) {
+                            const oldItem = getItem(existing.proposerItemId);
+                            if (oldItem && oldItem.status === 'reserved') oldItem.status = 'available';
+                        }
+                        if (offerItemId) {
+                            const ni = getItem(offerItemId);
+                            if (ni) ni.status = 'reserved';
+                        }
+                        existing.proposerItemId = offerItemId || null;
+                        existing.coins = offerCoins;
+                        existing.message = message;
+                        existing.type = offerItemId ? 'trade' : 'purchase';
+                        existing.updatedAt = Date.now();
+                        existing.snapshots = [];
+                        if (offerItemId) existing.snapshots.push({ itemId: offerItemId, ownerId: currentUser.id });
+                        existing.snapshots.push({ itemId: targetItem.id, ownerId: targetItem.ownerId });
+
+                        notify(targetItem.ownerId, `${currentUser.name} atualizou a proposta por "${targetItem.title}".`);
+                        window._editingTradeId = null;
+                        save();
+                        closeModal('tradeProposalModal');
+                        if (typeof renderChatContext === 'function') renderChatContext();
+                        if (typeof renderTrades === 'function') renderTrades();
+                        renderAll();
+                        showToast('Oferta atualizada.', 'success');
+                        return;
+                    }
+                    window._editingTradeId = null;
+                }
+
                 const trade = {
                     id: nextId(),
                     type: offerItemId ? 'trade' : 'purchase',

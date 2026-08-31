@@ -42,6 +42,7 @@ function showSection(name) {
             break;
         case 'trades':
             if (typeof renderTrades === 'function') renderTrades();
+            if (typeof renderMyChatsList === 'function') renderMyChatsList('myChatsList');
             break;
         case 'ranking':
             renderRanking();
@@ -216,6 +217,7 @@ function clearNotifications() {
 function renderAll() {
     if (typeof updateWalletUI === 'function') updateWalletUI();
     renderNotifBadge();
+    if (typeof renderChatBadge === 'function') renderChatBadge();
     if (typeof renderGrid === 'function') renderGrid();
     if (currentUser && typeof renderTrades === 'function') {
         const tradesSection = document.getElementById('sec-trades');

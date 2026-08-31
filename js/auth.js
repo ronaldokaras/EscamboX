@@ -302,6 +302,8 @@ function afterLoginUI() {
     if (authArea) authArea.classList.toggle('hidden', logged);
     if (sellBtn) sellBtn.classList.toggle('hidden', !logged);
     if (notifBtn) notifBtn.classList.toggle('hidden', !logged);
+    const chatBarBtn = document.getElementById('chatBarBtn');
+    if (chatBarBtn) chatBarBtn.classList.toggle('hidden', !logged);
     if (userArea) userArea.classList.toggle('hidden', !logged);
 
     document.querySelectorAll('.auth-only').forEach(el => el.classList.toggle('hidden', !logged));
@@ -324,6 +326,7 @@ function afterLoginUI() {
 
     updateWalletUI();
     renderNotifBadge();
+    if (typeof renderChatBadge === 'function') renderChatBadge();
 }
 
 /**

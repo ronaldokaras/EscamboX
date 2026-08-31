@@ -64,6 +64,10 @@ async function init() {
         // 8. Scroll infinito
         setupInfiniteScroll();
 
+        // 9. Chat
+        if (typeof initChatListeners === 'function') initChatListeners();
+        if (typeof initAllCityAutocompletes === 'function') initAllCityAutocompletes();
+
         // --- Eventos globais ---
 
         // Fecha menus ao clicar fora

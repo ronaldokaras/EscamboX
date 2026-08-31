@@ -670,7 +670,7 @@ function openDetail(itemId) {
         if (item.acceptTrades) {
             actionButtons += `<button class="btn btn-secondary" onclick="openTradeProposal(${item.id})">🔄 Propor troca de item</button>`;
         }
-        actionButtons += `<button class="btn" onclick="openChat(${item.ownerId})">💬 Conversar</button>`;
+        actionButtons += `<button class="btn" onclick="openChat(${item.ownerId}, ${item.id})">💬 Conversar</button>`;
         actionButtons += `<button class="btn btn-danger" onclick="openDenounce(${item.id})">Denunciar</button>`;
     } else if (!currentUser) {
         actionButtons = `<button class="btn" onclick="openAuth('login')">Entre para negociar</button>`;

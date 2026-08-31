@@ -266,3 +266,119 @@ async function reverseGeocode(lat, lng) {
 function $id(id) {
     return typeof document !== 'undefined' ? document.getElementById(id) : null;
 }
+
+
+/* ============================================================
+   Autocomplete de cidades brasileiras (cidade, UF)
+   ============================================================ */
+const BR_CITIES = [
+    'São Paulo, SP','Guarulhos, SP','Campinas, SP','São Bernardo do Campo, SP','Santo André, SP','Osasco, SP','Ribeirão Preto, SP','Sorocaba, SP','Santos, SP','São José dos Campos, SP','Mauá, SP','Diadema, SP','Carapicuíba, SP','Mogi das Cruzes, SP','Piracicaba, SP','Bauru, SP','Jundiaí, SP','Franca, SP','Praia Grande, SP','Limeira, SP',
+    'Rio de Janeiro, RJ','São Gonçalo, RJ','Duque de Caxias, RJ','Nova Iguaçu, RJ','Niterói, RJ','Belford Roxo, RJ','Campos dos Goytacazes, RJ','São João de Meriti, RJ','Petrópolis, RJ','Volta Redonda, RJ','Magé, RJ','Itaboraí, RJ','Macaé, RJ','Cabo Frio, RJ',
+    'Belo Horizonte, MG','Uberlândia, MG','Contagem, MG','Juiz de Fora, MG','Betim, MG','Montes Claros, MG','Ribeirão das Neves, MG','Uberaba, MG','Governador Valadares, MG','Ipatinga, MG','Sete Lagoas, MG','Divinópolis, MG','Santa Luzia, MG','Ibirité, MG','Poços de Caldas, MG',
+    'Curitiba, PR','Londrina, PR','Maringá, PR','Ponta Grossa, PR','Cascavel, PR','São José dos Pinhais, PR','Foz do Iguaçu, PR','Colombo, PR','Guarapuava, PR','Paranaguá, PR','Araucária, PR','Toledo, PR','Apucarana, PR','Pinhais, PR','Campo Largo, PR','União da Vitória, PR','Paula Freitas, PR','Porto União, SC',
+    'Porto Alegre, RS','Caxias do Sul, RS','Pelotas, RS','Canoas, RS','Santa Maria, RS','Gravataí, RS','Viamão, RS','Novo Hamburgo, RS','São Leopoldo, RS','Rio Grande, RS','Alvorada, RS','Passo Fundo, RS','Uruguaiana, RS','Cachoeirinha, RS','Santa Cruz do Sul, RS','Bagé, RS',
+    'Salvador, BA','Feira de Santana, BA','Vitória da Conquista, BA','Camaçari, BA','Juazeiro, BA','Ilhéus, BA','Itabuna, BA','Lauro de Freitas, BA','Jequié, BA','Teixeira de Freitas, BA','Barreiras, BA','Alagoinhas, BA','Porto Seguro, BA',
+    'Fortaleza, CE','Caucaia, CE','Juazeiro do Norte, CE','Maracanaú, CE','Sobral, CE','Crato, CE','Itapipoca, CE','Maranguape, CE','Iguatu, CE','Quixadá, CE',
+    'Recife, PE','Jaboatão dos Guararapes, PE','Olinda, PE','Caruaru, PE','Petrolina, PE','Paulista, PE','Cabo de Santo Agostinho, PE','Camaragibe, PE','Garanhuns, PE','Vitória de Santo Antão, PE',
+    'Brasília, DF','Goiânia, GO','Aparecida de Goiânia, GO','Anápolis, GO','Rio Verde, GO','Luziânia, GO','Águas Lindas de Goiás, GO','Valparaíso de Goiás, GO','Trindade, GO','Formosa, GO',
+    'Belém, PA','Ananindeua, PA','Santarém, PA','Marabá, PA','Castanhal, PA','Parauapebas, PA','Abaetetuba, PA','Cametá, PA',
+    'Manaus, AM','Parintins, AM','Itacoatiara, AM','Manacapuru, AM','Coari, AM',
+    'Florianópolis, SC','Joinville, SC','Blumenau, SC','São José, SC','Criciúma, SC','Chapecó, SC','Itajaí, SC','Jaraguá do Sul, SC','Lages, SC','Palhoça, SC','Balneário Camboriú, SC','Brusque, SC',
+    'Vitória, ES','Vila Velha, ES','Serra, ES','Cariacica, ES','Cachoeiro de Itapemirim, ES','Linhares, ES','São Mateus, ES','Guarapari, ES',
+    'Natal, RN','Mossoró, RN','Parnamirim, RN','São Gonçalo do Amarante, RN','Macaíba, RN','Ceará-Mirim, RN',
+    'João Pessoa, PB','Campina Grande, PB','Santa Rita, PB','Patos, PB','Bayeux, PB','Sousa, PB',
+    'Maceió, AL','Arapiraca, AL','Rio Largo, AL','Palmeira dos Índios, AL',
+    'Aracaju, SE','Nossa Senhora do Socorro, SE','Lagarto, SE','Itabaiana, SE',
+    'São Luís, MA','Imperatriz, MA','São José de Ribamar, MA','Timon, MA','Caxias, MA','Codó, MA','Paço do Lumiar, MA',
+    'Teresina, PI','Parnaíba, PI','Picos, PI','Piripiri, PI',
+    'Cuiabá, MT','Várzea Grande, MT','Rondonópolis, MT','Sinop, MT','Tangará da Serra, MT','Cáceres, MT',
+    'Campo Grande, MS','Dourados, MS','Três Lagoas, MS','Corumbá, MS','Ponta Porã, MS',
+    'Palmas, TO','Araguaína, TO','Gurupi, TO','Porto Nacional, TO',
+    'Porto Velho, RO','Ji-Paraná, RO','Ariquemes, RO','Vilhena, RO','Cacoal, RO',
+    'Rio Branco, AC','Cruzeiro do Sul, AC','Sena Madureira, AC',
+    'Boa Vista, RR','Rorainópolis, RR','Caracaraí, RR','Alto Alegre, RR',
+    'Macapá, AP','Santana, AP','Laranjal do Jari, AP'
+];
+
+/**
+ * Liga autocomplete de cidade/UF a um input.
+ * @param {string|HTMLElement} inputOrId
+ */
+function setupCityAutocomplete(inputOrId) {
+    const input = typeof inputOrId === 'string' ? document.getElementById(inputOrId) : inputOrId;
+    if (!input || input.dataset.cityAc === '1') return;
+    input.dataset.cityAc = '1';
+    input.setAttribute('autocomplete', 'off');
+
+    let box = document.createElement('div');
+    box.className = 'city-ac-list';
+    box.hidden = true;
+    input.parentElement.style.position = input.parentElement.style.position || 'relative';
+    input.parentElement.appendChild(box);
+
+    let active = -1;
+    let matches = [];
+
+    function hide() {
+        box.hidden = true;
+        active = -1;
+        matches = [];
+    }
+
+    function show(list) {
+        matches = list;
+        active = -1;
+        if (!list.length) { hide(); return; }
+        box.innerHTML = list.map((c, i) =>
+            `<button type="button" class="city-ac-item" data-idx="${i}">${esc(c)}</button>`
+        ).join('');
+        box.hidden = false;
+    }
+
+    function pick(city) {
+        input.value = city;
+        hide();
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.focus();
+    }
+
+    input.addEventListener('input', () => {
+        const q = norm(input.value);
+        if (q.length < 2) { hide(); return; }
+        const found = BR_CITIES.filter(c => norm(c).includes(q)).slice(0, 8);
+        show(found);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (box.hidden) return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            active = Math.min(active + 1, matches.length - 1);
+            [...box.children].forEach((el, i) => el.classList.toggle('active', i === active));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            active = Math.max(active - 1, 0);
+            [...box.children].forEach((el, i) => el.classList.toggle('active', i === active));
+        } else if (e.key === 'Enter' && active >= 0) {
+            e.preventDefault();
+            pick(matches[active]);
+        } else if (e.key === 'Escape') {
+            hide();
+        }
+    });
+
+    box.addEventListener('mousedown', (e) => {
+        const btn = e.target.closest('.city-ac-item');
+        if (!btn) return;
+        e.preventDefault();
+        pick(matches[parseInt(btn.dataset.idx, 10)]);
+    });
+
+    input.addEventListener('blur', () => setTimeout(hide, 150));
+}
+
+function initAllCityAutocompletes() {
+    ['searchLocationInput', 'rgLocation', 'fLocation'].forEach(id => {
+        if (document.getElementById(id)) setupCityAutocomplete(id);
+    });
+}

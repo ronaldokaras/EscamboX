@@ -41,6 +41,15 @@
                 <span id="notifBadge" class="notification-badge hidden" aria-label="Número de notificações não lidas">0</span>
             </button>
 
+            <button id="chatBarBtn" class="chat-bar-btn hidden" onclick="toggleChatPanel()" 
+                    aria-label="Conversas" title="Conversas" type="button" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                <span class="chat-bar-label">Conversas</span>
+                <span id="chatBadge" class="notification-badge hidden" aria-label="Mensagens">0</span>
+            </button>
+
             <div id="userArea" class="user-menu hidden">
                 <button class="user-btn" onclick="toggleUserMenu(event)" aria-haspopup="true" 
                         aria-expanded="false" title="Menu do usuário" type="button">
@@ -165,6 +174,8 @@
 
         <!-- Seção Negócios -->
         <section id="sec-trades" class="hidden" aria-labelledby="tradesTitle">
+            <h2 class="section-title">Conversas</h2>
+            <div id="myChatsList" class="chats-list"></div>
             <h2 id="tradesTitle" class="section-title">Propostas recebidas</h2>
             <ul id="incomingTrades" class="proposal-list"></ul>
             <h2 class="section-title">Minhas propostas</h2>
@@ -520,13 +531,14 @@
 
     <!-- Chat -->
     <div id="chatModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="chatTitle" aria-hidden="true">
-        <div class="modal-content small">
+        <div class="modal-content">
             <button class="close-modal" onclick="closeModal('chatModal')" aria-label="Fechar modal" type="button">×</button>
-            <h2 id="chatTitle" class="mb-3">Negociação & Chat</h2>
+            <h2 id="chatTitle" class="mb-2">Negociação & Chat</h2>
+            <div id="chatContext" class="chat-context"></div>
             <div id="chatMessages" class="chat-messages chat-box" aria-live="polite"></div>
             <div class="chat-input-row mt-2">
                 <label for="chatInput" class="visually-hidden">Mensagem</label>
-                <input type="text" id="chatInput" placeholder="Escreva sua mensagem..." maxlength="200" class="form-input">
+                <input type="text" id="chatInput" placeholder="Escreva sua mensagem..." maxlength="200" class="form-input flex-1">
                 <button class="btn" id="sendChatBtn" type="button">Enviar</button>
             </div>
         </div>
@@ -557,6 +569,18 @@
             </div>
         </div>
     </div>
+
+    
+    <!-- Painel lateral de conversas -->
+    <aside id="chatPanel" class="chat-panel" aria-hidden="true" aria-label="Lista de conversas">
+        <div class="chat-panel-header">
+            <h2>Conversas</h2>
+            <button type="button" class="close-modal" onclick="closeChatPanel()" aria-label="Fechar">×</button>
+        </div>
+        <div id="chatPanelList" class="chat-panel-list"></div>
+        <p class="chat-panel-hint text-muted fs-xs">Abra um item e use “Conversar” para iniciar uma negociação.</p>
+    </aside>
+    <div id="chatPanelBackdrop" class="chat-panel-backdrop" onclick="closeChatPanel()" hidden></div>
 
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
